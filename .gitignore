@@ -1,0 +1,11 @@
+node_modules/
+.pnpm/
+dist/
+build/
+.cache/
+coverage/
+.env
+.DS_Store
+.turbo/
+apps/api/dist/
+apps/admin-web/dist/

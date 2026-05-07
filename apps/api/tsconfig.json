@@ -1,0 +1,15 @@
+{
+  "extends": "../../packages/ts-config/nestjs.json",
+  "compilerOptions": {
+
+    "paths": {
+    "@tienda/shared-utils": ["../../packages/shared-utils/src/index.ts"]
+    
+    
+    }
+
+
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}
