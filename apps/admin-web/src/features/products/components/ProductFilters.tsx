@@ -29,7 +29,7 @@ export function ProductFilters({ filters, onChange }: Props) {
         className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
         <option value="">Todas las categorías</option>
-        {categoriesData?.data?.map(c => (
+        {categoriesData?.data?.data?.map(c => (
           <option key={c.id} value={c.id}>{c.name}</option>
         ))}
       </select>
@@ -40,7 +40,7 @@ export function ProductFilters({ filters, onChange }: Props) {
         className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
         <option value="">Todas las marcas</option>
-        {brandsData?.data?.map(b => (
+        {brandsData?.data?.data?.map(b => (
           <option key={b.id} value={b.id}>{b.name}</option>
         ))}
       </select>

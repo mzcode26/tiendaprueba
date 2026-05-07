@@ -1,9 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { categorySchema, type CategoryFormData } from '../schemas/product.schema';
-import { useCategories } from '../hooks/useProducts';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { productService } from '../services/product.service';
+import { useCategories, useCreateCategory } from '../hooks/useProducts';
 import { toast } from 'sonner';
 
 interface Props {
@@ -11,23 +9,22 @@ interface Props {
 }
 
 export function CategoryModal({ onClose }: Props) {
-  const qc = useQueryClient();
   const { data: categoriesData } = useCategories();
+  const createCategory = useCreateCategory();
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<CategoryFormData>({
     resolver: zodResolver(categorySchema),
     defaultValues: { isActive: true },
   });
 
-  const createCategory = useMutation({
-    mutationFn: productService.createCategory,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['categories'] });
-      toast.success('Categoría creada');
-      reset();
-    },
-    onError: () => toast.error('Error al crear categoría'),
-  });
+  const onSubmit = (data: CategoryFormData) => {
+    createCategory.mutate(data, {
+      onSuccess: () => { toast.success('Categoría creada'); reset(); },
+      onError: () => toast.error('Error al crear categoría'),
+    });
+  };
+
+  const categories = categoriesData?.data?.data ?? [];
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -37,12 +34,11 @@ export function CategoryModal({ onClose }: Props) {
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
         </div>
 
-        {/* Existing categories */}
         <div className="mb-4 max-h-40 overflow-y-auto space-y-1">
-          {!categoriesData?.data?.length ? (
+          {!categories.length ? (
             <p className="text-sm text-gray-400">Sin categorías</p>
           ) : (
-            categoriesData.data.map(c => (
+            categories.map(c => (
               <div key={c.id} className="flex items-center justify-between px-3 py-1.5 bg-gray-50 rounded-lg">
                 <span className="text-sm">{c.name}</span>
                 <span className={`text-xs px-2 py-0.5 rounded-full ${
@@ -55,19 +51,23 @@ export function CategoryModal({ onClose }: Props) {
           )}
         </div>
 
-        {/* New category form */}
-        <form onSubmit={handleSubmit(d => createCategory.mutate(d))} className="space-y-3 border-t pt-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 border-t pt-4">
           <p className="text-sm font-medium text-gray-700">Nueva categoría</p>
           <div>
-            <input {...register('name')} placeholder="Nombre de la categoría"
-              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input
+              {...register('name')}
+              placeholder="Nombre de la categoría"
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
             {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
           </div>
           <div>
-            <select {...register('parentId')}
-              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <select
+              {...register('parentId')}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
               <option value="">Sin categoría padre</option>
-              {categoriesData?.data?.map(c => (
+              {categories.map(c => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>

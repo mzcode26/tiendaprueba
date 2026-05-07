@@ -83,22 +83,19 @@ const ProductsPage = () => {
 
       {/* Products Table */}
       <ProductsTable
-        products={products || { data: [], total: 0, page: 1, limit: 10, totalPages: 0 }}
-        isLoading={isLoading}
+        products={products?.data?.data ?? []}
         onEdit={handleEdit}
         onDelete={handleDelete}
       />
 
       {/* Modals */}
-      <CategoryModal
-        isOpen={showCategoryModal}
-        onClose={() => setShowCategoryModal(false)}
-      />
+        {showCategoryModal && (
+          <CategoryModal onClose={() => setShowCategoryModal(false)} />
+        )}
 
-      <BrandModal
-        isOpen={showBrandModal}
-        onClose={() => setShowBrandModal(false)}
-      />
+      {showBrandModal && (
+          <BrandModal onClose={() => setShowBrandModal(false)} />
+        )}
 
       {/* Delete Confirmation Modal */}
       {deletingProduct && (
