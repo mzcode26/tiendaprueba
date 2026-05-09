@@ -1,7 +1,13 @@
-import { IsNumber, Min } from 'class-validator';
+import { IsNumber, IsOptional, Min } from 'class-validator';
 
 export class UpdateInventoryDto {
+  @IsOptional()
   @IsNumber()
   @Min(0)
-  quantity!: number;
+  minStock?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  maxStock?: number;
 }

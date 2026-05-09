@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { v2 as cloudinary } from 'cloudinary';
+import type { UploadApiResponse, UploadApiErrorResponse } from 'cloudinary';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
@@ -12,18 +13,22 @@ export class FilesService {
     });
   }
 
-  async uploadFile(file: Express.Multer.File, folder = 'tienda'): Promise<{
-    url: string;
-    publicId: string;
-  }> {
-    return new Promise((resolve, reject) => {
+  async uploadFile(
+    file: Express.Multer.File,
+    folder = 'tienda',
+  ): Promise<{ url: string; publicId: string }> {
+    return new Promise<{ url: string; publicId: string }>((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
           folder,
           resource_type: 'auto',
         },
-        (error, result) => {
+        (
+          error: UploadApiErrorResponse | undefined,
+          result: UploadApiResponse | undefined,
+        ) => {
           if (error) return reject(error);
+          if (!result) return reject(new Error('Upload failed: no result returned'));
           resolve({
             url: result.secure_url,
             publicId: result.public_id,
@@ -35,11 +40,15 @@ export class FilesService {
   }
 
   async deleteFile(publicId: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      cloudinary.uploader.destroy(publicId, (error) => {
-        if (error) return reject(error);
-        resolve();
-      });
+    return new Promise<void>((resolve, reject) => {
+      cloudinary.uploader.destroy(
+        publicId,
+        (error: UploadApiErrorResponse | undefined, _result: unknown) => {
+          if (error) return reject(error);
+          // opcional: podrías comprobar result si querés validar el estado devuelto por Cloudinary
+          resolve();
+        },
+      );
     });
   }
 }

@@ -1,142 +1,159 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { AuthRepository } from './auth.repository';
+import { LoginDto } from './dto/login.dto';
+import { JwtPayload } from './types/jwt-payload.type';
+import { AuthResponseDto } from './dto/auth-response.dto';
 
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly authRepository: AuthRepository,
-    private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
+    private authRepository: AuthRepository,
+    private jwtService: JwtService,
+    private configService: ConfigService,
   ) {}
 
-  private async generateToken(payload: Record<string, unknown>, expiresIn: string) {
-    return this.jwtService.signAsync(payload, { expiresIn });
+  async login(dto: LoginDto, tenantId: string): Promise<AuthResponseDto> {
+    const user = await this.authRepository.findUserByEmail(dto.email, tenantId);
+
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const passwordValid = await bcrypt.compare(dto.password, user.passwordHash);
+    if (!passwordValid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const permissions = this.extractPermissions(user);
+    const roles = user.roles.map((ur) => ur.role.name);
+
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      tenantId: user.tenantId,
+      roles,
+      permissions,
+    };
+
+    const tokens = await this.generateTokens(payload);
+    const refreshTokenHash = await bcrypt.hash(tokens.refreshToken, 10);
+    await this.authRepository.updateRefreshToken(user.id, refreshTokenHash);
+
+    return {
+      ...tokens,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        tenantId: user.tenantId,
+        roles,
+        permissions,
+      },
+    };
   }
 
-  private buildUserResponse(user: any) {
+  async refresh(
+    userId: string,
+    refreshToken: string,
+  ): Promise<AuthResponseDto> {
+    const user = await this.authRepository.findUserById(userId);
+
+    if (!user || !user.refreshTokenHash || !user.isActive) {
+      throw new UnauthorizedException('Access denied');
+    }
+
+    const tokenValid = await bcrypt.compare(refreshToken, user.refreshTokenHash);
+    if (!tokenValid) {
+      throw new UnauthorizedException('Access denied');
+    }
+
+    const permissions = this.extractPermissions(user);
+    const roles = user.roles.map((ur) => ur.role.name);
+
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      tenantId: user.tenantId,
+      roles,
+      permissions,
+    };
+
+    const tokens = await this.generateTokens(payload);
+    const refreshTokenHash = await bcrypt.hash(tokens.refreshToken, 10);
+    await this.authRepository.updateRefreshToken(user.id, refreshTokenHash);
+
+    return {
+      ...tokens,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        tenantId: user.tenantId,
+        roles,
+        permissions,
+      },
+    };
+  }
+
+  async logout(userId: string): Promise<void> {
+    await this.authRepository.updateRefreshToken(userId, null);
+  }
+
+  async getProfile(userId: string) {
+    const user = await this.authRepository.findUserById(userId);
+    if (!user) throw new UnauthorizedException('User not found');
+
+    const permissions = this.extractPermissions(user);
+    const roles = user.roles.map((ur) => ur.role.name);
+
     return {
       id: user.id,
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      roles: user.roles.map((userRole: any) => ({
-        id: userRole.role.id,
-        name: userRole.role.name,
-      })),
+      tenantId: user.tenantId,
+      isActive: user.isActive,
+      lastLoginAt: user.lastLoginAt,
+      roles,
+      permissions,
     };
   }
 
-  async login(tenantSlug: string, email: string, password: string) {
-    const tenant = await this.authRepository.findTenantBySlug(tenantSlug);
-    if (!tenant) {
-      throw new UnauthorizedException('Invalid tenant or credentials');
+  private extractPermissions(user: {
+    roles: {
+      role: { permissions: { permission: { name: string } }[] };
+    }[];
+  }): string[] {
+    const permSet = new Set<string>();
+    for (const ur of user.roles) {
+      for (const rp of ur.role.permissions) {
+        permSet.add(rp.permission.name);
+      }
     }
-
-    const user = await this.authRepository.findUserByEmail(tenant.id, email);
-    if (!user) {
-      throw new UnauthorizedException('Invalid tenant or credentials');
-    }
-
-    const passwordMatches = await bcrypt.compare(password, user.passwordHash);
-    if (!passwordMatches) {
-      throw new UnauthorizedException('Invalid tenant or credentials');
-    }
-
-    const accessToken = await this.generateToken(
-      {
-        sub: user.id,
-        email: user.email,
-        tenantId: tenant.id,
-        type: 'access',
-      },
-      this.configService.get<string>('JWT_EXPIRES_IN', '15m'),
-    );
-
-    const refreshToken = await this.generateToken(
-      {
-        sub: user.id,
-        email: user.email,
-        tenantId: tenant.id,
-        type: 'refresh',
-      },
-      this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '7d'),
-    );
-
-    const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
-    await this.authRepository.saveRefreshToken(user.id, refreshTokenHash);
-    await this.authRepository.updateLastLogin(user.id);
-
-    return {
-      accessToken,
-      refreshToken,
-      user: this.buildUserResponse(user),
-    };
+    return Array.from(permSet);
   }
 
-  async refreshTokens(userId: string, refreshToken: string) {
-    const user = await this.authRepository.findUserById(userId);
-    if (!user || !user.refreshTokenHash) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
+  private async generateTokens(payload: JwtPayload) {
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwtService.signAsync(payload, {
+        secret: this.configService.getOrThrow<string>('JWT_SECRET'),
+        expiresIn: this.configService.get<string>('JWT_EXPIRES_IN') ?? '15m',
+      }),
+      this.jwtService.signAsync(payload, {
+        secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
+        expiresIn:
+          this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') ?? '7d',
+      }),
+    ]);
 
-    const isValid = await bcrypt.compare(refreshToken, user.refreshTokenHash);
-    if (!isValid) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-
-    const accessToken = await this.generateToken(
-      {
-        sub: user.id,
-        email: user.email,
-        tenantId: user.tenantId,
-        type: 'access',
-      },
-      this.configService.get<string>('JWT_EXPIRES_IN', '15m'),
-    );
-
-    const newRefreshToken = await this.generateToken(
-      {
-        sub: user.id,
-        email: user.email,
-        tenantId: user.tenantId,
-        type: 'refresh',
-      },
-      this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '7d'),
-    );
-
-    const refreshTokenHash = await bcrypt.hash(newRefreshToken, 10);
-    await this.authRepository.saveRefreshToken(user.id, refreshTokenHash);
-
-    return {
-      accessToken,
-      refreshToken: newRefreshToken,
-    };
-  }
-
-  async logout(userId: string) {
-    await this.authRepository.saveRefreshToken(userId, null);
-    return { success: true, message: 'Logged out successfully' };
-  }
-
-  async getProfile(userId: string) {
-    const user = await this.authRepository.findUserById(userId);
-    if (!user) {
-      throw new UnauthorizedException('User not found');
-    }
-    return this.buildUserResponse(user);
-  }
-
-  async getUserPermissions(userId: string) {
-    const user = await this.authRepository.findUserById(userId);
-    if (!user) {
-      return [];
-    }
-
-    return user.roles.flatMap((userRole: any) =>
-      userRole.role.permissions.map((rolePermission: any) => rolePermission.permission.name),
-    );
+    return { accessToken, refreshToken };
   }
 }

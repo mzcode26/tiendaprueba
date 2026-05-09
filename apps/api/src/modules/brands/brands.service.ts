@@ -1,57 +1,48 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { generateSlug } from '@tienda/shared-utils';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { BrandsRepository } from './brands.repository';
+import { CreateBrandDto } from './dto/create-brand.dto';
+import { UpdateBrandDto } from './dto/update-brand.dto';
 
 @Injectable()
 export class BrandsService {
-  constructor(private readonly repository: BrandsRepository) {}
+  constructor(private brandsRepository: BrandsRepository) {}
 
-  async findAll(tenantId: string, page: number = 1, limit: number = 20, search?: string) {
-    return this.repository.findAll(tenantId, { page, limit, search });
+  findAll(tenantId: string) {
+    return this.brandsRepository.findAll(tenantId);
   }
 
   async findById(id: string, tenantId: string) {
-    const brand = await this.repository.findById(id, tenantId);
-    if (!brand) {
-      throw new NotFoundException('Brand not found');
-    }
+    const brand = await this.brandsRepository.findById(id, tenantId);
+    if (!brand) throw new NotFoundException('Brand not found');
     return brand;
   }
 
-  async create(tenantId: string, data: any) {
-    const slug = data.slug || generateSlug(data.name);
-    const existing = await this.repository.findBySlug(slug, tenantId);
-    if (existing) {
-      throw new BadRequestException('Brand slug already exists');
-    }
+  async create(tenantId: string, dto: CreateBrandDto) {
+    const slug = dto.name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
 
-    return this.repository.create(tenantId, { ...data, slug });
+    const existing = await this.brandsRepository.findBySlug(slug, tenantId);
+    if (existing) throw new ConflictException('Brand with this name already exists');
+
+    return this.brandsRepository.create(tenantId, dto);
   }
 
-  async update(id: string, tenantId: string, data: any) {
-    const brand = await this.findById(id, tenantId);
-
-    if (data.name && !data.slug) {
-      data.slug = generateSlug(data.name);
-    }
-
-    if (data.slug && data.slug !== brand.slug) {
-      const existing = await this.repository.findBySlug(data.slug, tenantId);
-      if (existing && existing.id !== id) {
-        throw new BadRequestException('Brand slug already exists');
-      }
-    }
-
-    return this.repository.update(id, tenantId, data);
+  async update(id: string, tenantId: string, dto: UpdateBrandDto) {
+    await this.findById(id, tenantId);
+    return this.brandsRepository.update(id, dto);
   }
 
   async remove(id: string, tenantId: string) {
     await this.findById(id, tenantId);
-    const activeProducts = await this.repository.countActiveProducts(id, tenantId);
-    if (activeProducts > 0) {
-      throw new BadRequestException('Cannot delete brand with active products');
-    }
-    await this.repository.softDelete(id, tenantId);
-    return { success: true, message: 'Brand deleted successfully' };
+    await this.brandsRepository.softDelete(id);
+    return { message: 'Brand deleted successfully' };
   }
 }

@@ -1,47 +1,36 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CreateAttributeDto } from './dto/create-attribute.dto';
+import { UpdateAttributeDto } from './dto/update-attribute.dto';
+
+function toSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
 
 @Injectable()
 export class AttributesRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {}
 
-  async findAll(tenantId: string, filters: { page: number; limit: number; search?: string }) {
-    const where: any = {
-      tenantId,
-      deletedAt: null,
-    };
-
-    if (filters.search) {
-      where.name = { contains: filters.search, mode: 'insensitive' };
-    }
-
-    const [total, data] = await Promise.all([
-      this.prisma.attribute.count({ where }),
-      this.prisma.attribute.findMany({
-        where,
-        skip: (filters.page - 1) * filters.limit,
-        take: filters.limit,
-        include: {
-          values: {
-            where: { deletedAt: null },
-            orderBy: { createdAt: 'asc' },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      }),
-    ]);
-
-    return { data, total };
+  async findAll(tenantId: string) {
+    return this.prisma.attribute.findMany({
+      where: { tenantId, deletedAt: null },
+      include: {
+        values: { where: { deletedAt: null }, orderBy: { value: 'asc' } },
+      },
+      orderBy: { name: 'asc' },
+    });
   }
 
   async findById(id: string, tenantId: string) {
     return this.prisma.attribute.findFirst({
       where: { id, tenantId, deletedAt: null },
       include: {
-        values: {
-          where: { deletedAt: null },
-          orderBy: { createdAt: 'asc' },
-        },
+        values: { where: { deletedAt: null }, orderBy: { value: 'asc' } },
       },
     });
   }
@@ -52,80 +41,53 @@ export class AttributesRepository {
     });
   }
 
-  async create(tenantId: string, data: any) {
+  async create(tenantId: string, dto: CreateAttributeDto) {
+    const slug = toSlug(dto.name);
     return this.prisma.attribute.create({
       data: {
         tenantId,
-        name: data.name,
-        slug: data.slug,
+        name: dto.name,
+        slug,
+        values: dto.values
+          ? {
+              create: dto.values.map((v) => ({
+                tenantId,
+                value: v.value,
+                slug: toSlug(v.value),
+              })),
+            }
+          : undefined,
+      },
+      include: {
+        values: { where: { deletedAt: null } },
       },
     });
   }
 
-  async update(id: string, _tenantId: string, data: any) {
-    return this.prisma.attribute.update({
-      where: { id },
-      data: {
-        name: data.name,
-        slug: data.slug,
-      },
-    });
+  async update(id: string, dto: UpdateAttributeDto) {
+    const data: Record<string, unknown> = { ...dto };
+    if (dto.name) data.slug = toSlug(dto.name);
+    return this.prisma.attribute.update({ where: { id }, data });
   }
 
-  async softDelete(id: string, _tenantId: string) {
-    return this.prisma.attribute.update({
-      where: { id },
-      data: { deletedAt: new Date() },
-    });
-  }
-
-  async findValueById(id: string, tenantId: string) {
-    return this.prisma.attributeValue.findFirst({
-      where: { id, tenantId, deletedAt: null },
-      include: { attribute: true },
-    });
-  }
-
-  async createValue(attributeId: string, tenantId: string, data: any) {
+  async addValue(attributeId: string, tenantId: string, value: string) {
+    const slug = toSlug(value);
     return this.prisma.attributeValue.create({
-      data: {
-        tenantId,
-        attributeId,
-        value: data.value,
-        slug: data.slug,
-      },
+      data: { attributeId, tenantId, value, slug },
     });
   }
 
-  async updateValue(id: string, _attributeId: string, _tenantId: string, data: any) {
+  async removeValue(valueId: string) {
     return this.prisma.attributeValue.update({
-      where: { id },
-      data: {
-        value: data.value,
-        slug: data.slug,
-      },
-    });
-  }
-
-  async softDeleteValue(id: string, _attributeId: string, _tenantId: string) {
-    return this.prisma.attributeValue.update({
-      where: { id },
+      where: { id: valueId },
       data: { deletedAt: new Date() },
     });
   }
 
-  async countActiveVariants(id: string, tenantId: string) {
-    return this.prisma.productVariantAttribute.count({
-      where: {
-        OR: [
-          { attributeId: id },
-          { attributeValue: { attributeId: id } },
-        ],
-        variant: {
-          tenantId,
-          deletedAt: null,
-        },
-      },
+  async softDelete(id: string) {
+    return this.prisma.attribute.update({
+      where: { id },
+      data: { deletedAt: new Date() },
     });
   }
 }

@@ -1,6 +1,7 @@
-export type JwtPayload = {
+export interface JwtPayload {
   sub: string;
   email: string;
   tenantId: string;
-  type: 'access' | 'refresh';
-};
+  roles: string[];
+  permissions: string[];
+}

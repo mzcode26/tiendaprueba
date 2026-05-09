@@ -1,52 +1,54 @@
+import {
+  IsString,
+  IsOptional,
+  IsArray,
+  IsNumber,
+  IsEnum,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
-import { IsArray, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min, ValidateNested, ArrayMinSize } from 'class-validator';
+
+export enum PaymentMethodType {
+  CASH = 'CASH',
+  CARD = 'CARD',
+  TRANSFER = 'TRANSFER',
+  OTHER = 'OTHER',
+}
 
 export class CreateSaleItemDto {
   @IsString()
-  @IsNotEmpty()
   variantId: string;
 
   @IsNumber()
   @Min(1)
   quantity: number;
 
-  @IsOptional()
   @IsNumber()
   @Min(0)
-  unitPrice?: number;
+  unitPrice: number;
 
   @IsOptional()
   @IsNumber()
   @Min(0)
-  discountAmount?: number = 0;
+  discount?: number;
 }
 
-export class AddPaymentDto {
-  @IsString()
-  @IsNotEmpty()
-  method: string;
+export class CreatePaymentDto {
+  @IsEnum(PaymentMethodType)
+  method: PaymentMethodType;
 
   @IsNumber()
-  @Min(0.01)
+  @Min(0)
   amount: number;
 
   @IsOptional()
   @IsString()
   reference?: string;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(1)
-  installments?: number = 1;
-
-  @IsOptional()
-  @IsNumber()
-  installmentAmount?: number;
 }
 
 export class CreateSaleDto {
   @IsString()
-  @IsNotEmpty()
   storeId: string;
 
   @IsOptional()
@@ -55,23 +57,26 @@ export class CreateSaleDto {
 
   @IsArray()
   @ValidateNested({ each: true })
-  @ArrayMinSize(1)
   @Type(() => CreateSaleItemDto)
   items: CreateSaleItemDto[];
 
   @IsOptional()
   @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => AddPaymentDto)
-  payments?: AddPaymentDto[];
+  payments?: CreatePaymentDto[];
 
   @IsOptional()
   @IsNumber()
   @Min(0)
-  discountAmount?: number = 0;
+  discountAmount?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  taxAmount?: number;
 
   @IsOptional()
   @IsString()
-  @MaxLength(500)
   notes?: string;
+
+  
 }

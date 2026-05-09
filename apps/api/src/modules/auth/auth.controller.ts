@@ -1,38 +1,50 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+  Get,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
-import { AuthResponseDto } from './dto/auth-response.dto';
 import { Public } from './decorators/public.decorator';
-import { RefreshAuthGuard } from './guards/refresh-auth.guard';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
+import { RefreshAuthGuard } from './guards/refresh-auth.guard';
+import type { JwtPayload } from './types/jwt-payload.type';
+import { Headers } from '@nestjs/common';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Post('login')
-  @Public()
-  async login(@Body() body: LoginDto): Promise<AuthResponseDto> {
-    return this.authService.login(body.tenantSlug, body.email, body.password);
-  }
+@Public()
+@Post('login')
+@HttpCode(HttpStatus.OK)
+login(
+  @Body() dto: LoginDto,
+  @Headers('x-tenant-id') tenantId: string,
+) {
+  return this.authService.login(dto, tenantId);
+}
 
-  @Post('refresh')
   @Public()
   @UseGuards(RefreshAuthGuard)
-  async refresh(@CurrentUser() user: any) {
-    return this.authService.refreshTokens(user.userId, user.refreshToken);
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  refresh(@CurrentUser() user: JwtPayload & { refreshToken: string }) {
+    return this.authService.refresh(user.sub, user.refreshToken);
   }
 
   @Post('logout')
-  @UseGuards(JwtAuthGuard)
-  async logout(@CurrentUser('userId') userId: string) {
-    return this.authService.logout(userId);
+  @HttpCode(HttpStatus.OK)
+  logout(@CurrentUser() user: JwtPayload) {
+    return this.authService.logout(user.sub);
   }
 
-  @Get('me')
-  @UseGuards(JwtAuthGuard)
-  async me(@CurrentUser('userId') userId: string) {
-    return this.authService.getProfile(userId);
+  @Get('profile')
+  getProfile(@CurrentUser() user: JwtPayload) {
+    return this.authService.getProfile(user.sub);
   }
 }

@@ -1,84 +1,70 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+} from '@nestjs/common';
 import { SalesService } from './sales.service';
-import { SaleFiltersDto, CreateSaleDto, AddPaymentDto, CancelSaleDto, RefundSaleDto } from './dto/index';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { PermissionsGuard } from '../auth/guards/permissions.guard';
-import { RequirePermissions } from '../auth/decorators/require-permissions.decorator';
+import { CreateSaleDto } from './dto/create-sale.dto';
+import { CancelSaleDto } from './dto/cancel-sale.dto';
+import { CreateRefundDto } from './dto/create-refund.dto';
+import { QuerySalesDto } from './dto/query-sales.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { RequirePermissions } from '../auth/decorators/require-permissions.decorator';
+import type { JwtPayload } from '../auth/types/jwt-payload.type';
 
 @Controller('sales')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class SalesController {
-  constructor(private readonly service: SalesService) {}
+  constructor(private readonly salesService: SalesService) {}
 
   @Get()
   @RequirePermissions('view_sales')
-  async findAll(
-    @CurrentUser('tenantId') tenantId: string,
-    @Query() filters: SaleFiltersDto,
-  ) {
-    return this.service.getSales(tenantId, filters);
+  findAll(@CurrentUser() user: JwtPayload, @Query() query: QuerySalesDto) {
+    return this.salesService.findAll(user.tenantId, query);
   }
 
   @Get('summary')
   @RequirePermissions('view_reports')
-  async getSummary(
-    @CurrentUser('tenantId') tenantId: string,
+  getSummary(
+    @CurrentUser() user: JwtPayload,
     @Query('storeId') storeId?: string,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
   ) {
-    return this.service.getSalesSummary(tenantId, storeId, startDate, endDate);
+    return this.salesService.getSummary(user.tenantId, storeId, dateFrom, dateTo);
   }
 
   @Get(':id')
   @RequirePermissions('view_sales')
-  async findOne(
-    @CurrentUser('tenantId') tenantId: string,
-    @Param('id') id: string,
-  ) {
-    return this.service.getSaleById(tenantId, id);
+  findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.salesService.findById(id, user.tenantId);
   }
 
   @Post()
   @RequirePermissions('create_sales')
-  async create(
-    @CurrentUser('tenantId') tenantId: string,
-    @CurrentUser('userId') userId: string,
-    @Body() data: CreateSaleDto,
-  ) {
-    return this.service.createSale(tenantId, userId, data);
-  }
-
-  @Post(':id/payments')
-  @RequirePermissions('create_sales')
-  async addPayment(
-    @CurrentUser('tenantId') tenantId: string,
-    @Param('id') saleId: string,
-    @Body() data: AddPaymentDto,
-  ) {
-    return this.service.addPayment(tenantId, saleId, data);
+  create(@Body() dto: CreateSaleDto, @CurrentUser() user: JwtPayload) {
+    return this.salesService.create(user.tenantId, user.sub, dto);
   }
 
   @Post(':id/cancel')
   @RequirePermissions('cancel_sales')
-  async cancel(
-    @CurrentUser('tenantId') tenantId: string,
-    @CurrentUser('userId') userId: string,
+  cancel(
     @Param('id') id: string,
-    @Body() data: CancelSaleDto,
+    @Body() dto: CancelSaleDto,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.service.cancelSale(tenantId, userId, id, data);
+    return this.salesService.cancel(id, user.tenantId, user.sub, dto);
   }
 
   @Post(':id/refund')
-  @RequirePermissions('refund_sales')
-  async refund(
-    @CurrentUser('tenantId') tenantId: string,
-    @CurrentUser('userId') userId: string,
-    @Param('id') saleId: string,
-    @Body() data: RefundSaleDto,
+  @RequirePermissions('cancel_sales')
+  refund(
+    @Param('id') id: string,
+    @Body() dto: CreateRefundDto,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.service.refundSale(tenantId, userId, saleId, data);
+    return this.salesService.refund(id, user.tenantId, user.sub, dto);
   }
 }

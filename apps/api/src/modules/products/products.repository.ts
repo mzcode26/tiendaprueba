@@ -1,73 +1,81 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CreateProductDto, CreateProductVariantDto } from './dto/create-product.dto';
+import { UpdateProductDto, UpdateProductVariantDto } from './dto/update-product.dto';
+import { CreateProductImageDto } from './dto/create-product-image.dto';
+
+function toSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
 
 @Injectable()
 export class ProductsRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {}
 
-  async findAll(tenantId: string, filters: {
-    page: number;
-    limit: number;
-    search?: string;
-    categoryId?: string;
-    brandId?: string;
-    isActive?: boolean;
-  }) {
-    const where: any = {
+  async findAll(
+    tenantId: string,
+    filters: {
+      search?: string;
+      categoryId?: string;
+      brandId?: string;
+      isActive?: boolean;
+      page?: number;
+      limit?: number;
+    },
+  ) {
+    const { search, categoryId, brandId, isActive, page = 1, limit = 20 } = filters;
+    const skip = (page - 1) * limit;
+
+    const where = {
       tenantId,
       deletedAt: null,
+      ...(isActive !== undefined && { isActive }),
+      ...(categoryId && { categoryId }),
+      ...(brandId && { brandId }),
+      ...(search && {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' as const } },
+          { description: { contains: search, mode: 'insensitive' as const } },
+          { tags: { has: search } },
+        ],
+      }),
     };
 
-    if (filters.search) {
-      where.OR = [
-        { name: { contains: filters.search, mode: 'insensitive' } },
-        { sku: { contains: filters.search, mode: 'insensitive' } },
-        { description: { contains: filters.search, mode: 'insensitive' } },
-      ];
-    }
-
-    if (filters.categoryId) {
-      where.categoryId = filters.categoryId;
-    }
-
-    if (filters.brandId) {
-      where.brandId = filters.brandId;
-    }
-
-    if (filters.isActive !== undefined) {
-      where.isActive = filters.isActive;
-    }
-
-    const [total, data] = await Promise.all([
-      this.prisma.product.count({ where }),
+    const [items, total] = await Promise.all([
       this.prisma.product.findMany({
         where,
-        skip: (filters.page - 1) * filters.limit,
-        take: filters.limit,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
         include: {
           category: true,
           brand: true,
+          images: { orderBy: { position: 'asc' } },
           variants: {
             where: { deletedAt: null },
             include: {
               attributes: {
-                include: {
-                  attribute: true,
-                  attributeValue: true,
-                },
+                include: { attribute: true, attributeValue: true },
               },
             },
           },
-          images: {
-            where: { deletedAt: null },
-            orderBy: { sortOrder: 'asc' },
-          },
         },
-        orderBy: { createdAt: 'desc' },
       }),
+      this.prisma.product.count({ where }),
     ]);
 
-    return { data, total };
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async findById(id: string, tenantId: string) {
@@ -76,64 +84,68 @@ export class ProductsRepository {
       include: {
         category: true,
         brand: true,
+        images: { orderBy: { position: 'asc' } },
         variants: {
           where: { deletedAt: null },
           include: {
             attributes: {
-              include: {
-                attribute: true,
-                attributeValue: true,
-              },
+              include: { attribute: true, attributeValue: true },
+            },
+            inventory: {
+              include: { store: true },
             },
           },
-        },
-        images: {
-          where: { deletedAt: null },
-          orderBy: { sortOrder: 'asc' },
         },
       },
     });
   }
 
-  async findBySku(sku: string, tenantId: string) {
+  async findBySlug(slug: string, tenantId: string) {
     return this.prisma.product.findFirst({
+      where: { slug, tenantId, deletedAt: null },
+    });
+  }
+
+  async findVariantBySku(sku: string, tenantId: string) {
+    return this.prisma.productVariant.findFirst({
       where: { sku, tenantId, deletedAt: null },
     });
   }
 
-  async create(tenantId: string, data: any) {
-    const { variants, images, ...productData } = data;
+  async create(tenantId: string, dto: CreateProductDto) {
+    const slug = toSlug(dto.name);
 
     return this.prisma.product.create({
       data: {
         tenantId,
-        ...productData,
-        variants: variants ? {
-          create: variants.map((variant: any) => ({
-            tenantId,
-            sku: variant.sku,
-            price: variant.price,
-            compareAtPrice: variant.compareAtPrice,
-            cost: variant.cost,
-            inventoryQuantity: variant.inventoryQuantity,
-            isDefault: variant.isDefault || false,
-            attributes: variant.attributes ? {
-              create: variant.attributes.map((attr: any) => ({
+        name: dto.name,
+        slug,
+        description: dto.description,
+        categoryId: dto.categoryId,
+        brandId: dto.brandId,
+        isActive: dto.isActive ?? true,
+        tags: dto.tags ?? [],
+        variants: dto.variants
+          ? {
+              create: dto.variants.map((v) => ({
                 tenantId,
-                attributeId: attr.attributeId,
-                attributeValueId: attr.attributeValueId,
+                sku: v.sku,
+                barcode: v.barcode,
+                price: v.price,
+                compareAtPrice: v.compareAtPrice,
+                costPrice: v.costPrice,
+                isActive: v.isActive ?? true,
+                attributes: v.attributes
+                  ? {
+                      create: v.attributes.map((a) => ({
+                        attributeId: a.attributeId,
+                        attributeValueId: a.attributeValueId,
+                      })),
+                    }
+                  : undefined,
               })),
-            } : undefined,
-          })),
-        } : undefined,
-        images: images ? {
-          create: images.map((image: any, index: number) => ({
-            tenantId,
-            url: image.url,
-            alt: image.alt,
-            sortOrder: image.sortOrder || index,
-          })),
-        } : undefined,
+            }
+          : undefined,
       },
       include: {
         category: true,
@@ -141,10 +153,7 @@ export class ProductsRepository {
         variants: {
           include: {
             attributes: {
-              include: {
-                attribute: true,
-                attributeValue: true,
-              },
+              include: { attribute: true, attributeValue: true },
             },
           },
         },
@@ -153,122 +162,93 @@ export class ProductsRepository {
     });
   }
 
-  async update(id: string, tenantId: string, data: any) {
-    const { variants, images, ...productData } = data;
-
+  async update(id: string, dto: UpdateProductDto) {
+    const data: Record<string, unknown> = { ...dto };
+    if (dto.name) data.slug = toSlug(dto.name);
     return this.prisma.product.update({
       where: { id },
+      data,
+      include: {
+        category: true,
+        brand: true,
+        variants: { where: { deletedAt: null } },
+        images: true,
+      },
+    });
+  }
+
+  async createVariant(
+    productId: string,
+    tenantId: string,
+    dto: CreateProductVariantDto,
+  ) {
+    return this.prisma.productVariant.create({
       data: {
-        ...productData,
-        variants: variants ? {
-          deleteMany: { productId: id },
-          create: variants.map((variant: any) => ({
-            tenantId,
-            sku: variant.sku,
-            price: variant.price,
-            compareAtPrice: variant.compareAtPrice,
-            cost: variant.cost,
-            inventoryQuantity: variant.inventoryQuantity,
-            isDefault: variant.isDefault || false,
-            attributes: variant.attributes ? {
-              create: variant.attributes.map((attr: any) => ({
-                tenantId,
-                attributeId: attr.attributeId,
-                attributeValueId: attr.attributeValueId,
+        productId,
+        tenantId,
+        sku: dto.sku,
+        barcode: dto.barcode,
+        price: dto.price,
+        compareAtPrice: dto.compareAtPrice,
+        costPrice: dto.costPrice,
+        isActive: dto.isActive ?? true,
+        attributes: dto.attributes
+          ? {
+              create: dto.attributes.map((a) => ({
+                attributeId: a.attributeId,
+                attributeValueId: a.attributeValueId,
               })),
-            } : undefined,
-          })),
-        } : undefined,
-        images: images ? {
-          deleteMany: { productId: id },
-          create: images.map((image: any, index: number) => ({
-            tenantId,
-            url: image.url,
-            alt: image.alt,
-            sortOrder: image.sortOrder || index,
-          })),
-        } : undefined,
+            }
+          : undefined,
       },
       include: {
-        category: true,
-        brand: true,
-        variants: {
-          include: {
-            attributes: {
-              include: {
-                attribute: true,
-                attributeValue: true,
-              },
-            },
-          },
+        attributes: {
+          include: { attribute: true, attributeValue: true },
         },
-        images: true,
       },
     });
   }
 
-  async softDelete(id: string, _tenantId: string) {
-    return this.prisma.product.update({
-      where: { id },
+  async updateVariant(variantId: string, dto: UpdateProductVariantDto) {
+    return this.prisma.productVariant.update({
+      where: { id: variantId },
+      data: {
+        ...(dto.sku && { sku: dto.sku }),
+        ...(dto.barcode !== undefined && { barcode: dto.barcode }),
+        ...(dto.price !== undefined && { price: dto.price }),
+        ...(dto.compareAtPrice !== undefined && { compareAtPrice: dto.compareAtPrice }),
+        ...(dto.costPrice !== undefined && { costPrice: dto.costPrice }),
+        ...(dto.isActive !== undefined && { isActive: dto.isActive }),
+      },
+    });
+  }
+
+  async softDeleteVariant(variantId: string) {
+    return this.prisma.productVariant.update({
+      where: { id: variantId },
       data: { deletedAt: new Date() },
     });
   }
 
-  async updateInventory(id: string, _tenantId: string, quantity: number) {
-    return this.prisma.product.update({
-      where: { id },
-      data: { inventoryQuantity: quantity },
-    });
-  }
-
-  async findVariantById(id: string, tenantId: string) {
-    return this.prisma.productVariant.findFirst({
-      where: { id, tenantId, deletedAt: null },
-      include: {
-        product: true,
-        attributes: {
-          include: {
-            attribute: true,
-            attributeValue: true,
-          },
-        },
-      },
-    });
-  }
-
-  async updateVariantInventory(id: string, _tenantId: string, quantity: number) {
-    return this.prisma.productVariant.update({
-      where: { id },
-      data: { inventoryQuantity: quantity },
-    });
-  }
-
-  async createImage(productId: string, tenantId: string, data: any) {
-    const maxSortOrder = await this.prisma.productImage.findFirst({
-      where: { productId },
-      orderBy: { sortOrder: 'desc' },
-    });
-
+  async addImage(productId: string, tenantId: string, dto: CreateProductImageDto) {
     return this.prisma.productImage.create({
       data: {
-        tenantId,
         productId,
-        url: data.url,
-        alt: data.alt,
-        sortOrder: data.sortOrder || (maxSortOrder ? maxSortOrder.sortOrder + 1 : 0),
+        tenantId,
+        url: dto.url,
+        altText: dto.altText,
+        position: dto.position ?? 0,
+        isPrimary: dto.isPrimary ?? false,
       },
     });
   }
 
-  async updateImageSortOrder(id: string, _tenantId: string, sortOrder: number) {
-    return this.prisma.productImage.update({
-      where: { id },
-      data: { sortOrder },
-    });
+  async removeImage(imageId: string) {
+    return this.prisma.productImage.delete({ where: { id: imageId } });
   }
 
-  async deleteImage(id: string, _tenantId: string) {
-    return this.prisma.productImage.update({
+  async softDelete(id: string) {
+    return this.prisma.product.update({
       where: { id },
       data: { deletedAt: new Date() },
     });

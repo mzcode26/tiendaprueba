@@ -1,14 +1,33 @@
-import { IsArray, IsBoolean, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min, ValidateNested } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsBoolean,
+  IsArray,
+  IsNumber,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
-class ProductVariantDto {
+export class CreateVariantAttributeDto {
+  @IsString()
+  attributeId: string;
+
+  @IsString()
+  attributeValueId: string;
+}
+
+export class CreateProductVariantDto {
+  @IsString()
+  sku: string;
+
   @IsOptional()
   @IsString()
-  sku?: string;
+  barcode?: string;
 
   @IsNumber()
   @Min(0)
-  price!: number;
+  price: number;
 
   @IsOptional()
   @IsNumber()
@@ -18,66 +37,26 @@ class ProductVariantDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
-  cost?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  inventoryQuantity?: number;
+  costPrice?: number;
 
   @IsOptional()
   @IsBoolean()
-  isDefault?: boolean;
+  isActive?: boolean;
 
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => ProductVariantAttributeDto)
-  attributes?: ProductVariantAttributeDto[];
-}
-
-class ProductVariantAttributeDto {
-  @IsString()
-  @IsNotEmpty()
-  attributeId!: string;
-
-  @IsString()
-  @IsNotEmpty()
-  attributeValueId!: string;
-}
-
-class ProductImageDto {
-  @IsString()
-  @IsNotEmpty()
-  url!: string;
-
-  @IsOptional()
-  @IsString()
-  alt?: string;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  sortOrder?: number;
+  @Type(() => CreateVariantAttributeDto)
+  attributes?: CreateVariantAttributeDto[];
 }
 
 export class CreateProductDto {
   @IsString()
-  @IsNotEmpty()
-  @MaxLength(255)
-  name!: string;
-
-  @IsOptional()
-  @IsString()
-  slug?: string;
+  name: string;
 
   @IsOptional()
   @IsString()
   description?: string;
-
-  @IsOptional()
-  @IsString()
-  sku?: string;
 
   @IsOptional()
   @IsString()
@@ -92,19 +71,13 @@ export class CreateProductDto {
   isActive?: boolean;
 
   @IsOptional()
-  @IsNumber()
-  @Min(0)
-  inventoryQuantity?: number;
+  @IsArray()
+  @IsString({ each: true })
+  tags?: string[];
 
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => ProductVariantDto)
-  variants?: ProductVariantDto[];
-
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => ProductImageDto)
-  images?: ProductImageDto[];
+  @Type(() => CreateProductVariantDto)
+  variants?: CreateProductVariantDto[];
 }

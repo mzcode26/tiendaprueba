@@ -1,6 +1,12 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateAttributeDto, CreateAttributeValueDto } from './create-attribute.dto';
+import { IsString, IsOptional } from 'class-validator';
 
-export class UpdateAttributeDto extends PartialType(CreateAttributeDto) {}
+export class UpdateAttributeDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+}
 
-export class UpdateAttributeValueDto extends PartialType(CreateAttributeValueDto) {}
+export class CreateAttributeValueDto {
+  @IsString()
+  value?: string;
+}

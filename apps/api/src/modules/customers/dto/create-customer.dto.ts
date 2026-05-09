@@ -1,12 +1,23 @@
-import { IsString, IsOptional, IsEmail, MaxLength, IsBoolean } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsEmail,
+  IsEnum,
+  IsDateString,
+} from 'class-validator';
+
+export enum CustomerGender {
+  MALE = 'MALE',
+  FEMALE = 'FEMALE',
+  OTHER = 'OTHER',
+  PREFER_NOT_TO_SAY = 'PREFER_NOT_TO_SAY',
+}
 
 export class CreateCustomerDto {
   @IsString()
-  @MaxLength(100)
   firstName: string;
 
   @IsString()
-  @MaxLength(100)
   lastName: string;
 
   @IsOptional()
@@ -15,30 +26,37 @@ export class CreateCustomerDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(20)
   phone?: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(50)
-  documentType?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(50)
-  documentNumber?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(200)
   address?: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(500)
-  notes?: string;
+  city?: string;
 
   @IsOptional()
-  @IsBoolean()
-  isActive?: boolean = true;
+  @IsString()
+  province?: string;
+
+  @IsOptional()
+  @IsString()
+  postalCode?: string;
+
+  @IsOptional()
+  @IsString()
+  taxId?: string;
+
+  @IsOptional()
+  @IsDateString()
+  birthDate?: string;
+
+  @IsOptional()
+  @IsEnum(CustomerGender)
+  gender?: CustomerGender;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }

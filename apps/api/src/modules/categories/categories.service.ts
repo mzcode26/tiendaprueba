@@ -1,83 +1,48 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { generateSlug } from '@tienda/shared-utils';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { CategoriesRepository } from './categories.repository';
+import { CreateCategoryDto } from './dto/create-category.dto';
+import { UpdateCategoryDto } from './dto/update-category.dto';
 
 @Injectable()
 export class CategoriesService {
-  constructor(private readonly repository: CategoriesRepository) {}
+  constructor(private categoriesRepository: CategoriesRepository) {}
 
-  async findAll(
-    tenantId: string,
-    page: number = 1,
-    limit: number = 20,
-    search?: string,
-    parentId?: string | null,
-  ) {
-    return this.repository.findAll(tenantId, { page, limit, search, parentId });
+  findAll(tenantId: string) {
+    return this.categoriesRepository.findAll(tenantId);
   }
 
   async findById(id: string, tenantId: string) {
-    const category = await this.repository.findById(id, tenantId);
-    if (!category) {
-      throw new NotFoundException('Category not found');
-    }
+    const category = await this.categoriesRepository.findById(id, tenantId);
+    if (!category) throw new NotFoundException('Category not found');
     return category;
   }
 
-  async create(tenantId: string, data: any) {
-    const slug = data.slug || generateSlug(data.name);
-    const existing = await this.repository.findBySlug(slug, tenantId);
-    if (existing) {
-      throw new BadRequestException('Category slug already exists');
-    }
+  async create(tenantId: string, dto: CreateCategoryDto) {
+    const slug = dto.name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
 
-    if (data.parentId) {
-      const parent = await this.repository.findById(data.parentId, tenantId);
-      if (!parent) {
-        throw new BadRequestException('Parent category not found');
-      }
-      if (data.parentId === data.id) {
-        throw new BadRequestException('Category cannot be its own parent');
-      }
-    }
+    const existing = await this.categoriesRepository.findBySlug(slug, tenantId);
+    if (existing) throw new ConflictException('Category with this name already exists');
 
-    return this.repository.create(tenantId, { ...data, slug });
+    return this.categoriesRepository.create(tenantId, dto);
   }
 
-  async update(id: string, tenantId: string, data: any) {
-    const category = await this.findById(id, tenantId);
-
-    if (data.name && !data.slug) {
-      data.slug = generateSlug(data.name);
-    }
-
-    if (data.slug && data.slug !== category.slug) {
-      const existing = await this.repository.findBySlug(data.slug, tenantId);
-      if (existing && existing.id !== id) {
-        throw new BadRequestException('Category slug already exists');
-      }
-    }
-
-    if (data.parentId) {
-      if (data.parentId === id) {
-        throw new BadRequestException('Category cannot be its own parent');
-      }
-      const parent = await this.repository.findById(data.parentId, tenantId);
-      if (!parent) {
-        throw new BadRequestException('Parent category not found');
-      }
-    }
-
-    return this.repository.update(id, tenantId, data);
+  async update(id: string, tenantId: string, dto: UpdateCategoryDto) {
+    await this.findById(id, tenantId);
+    return this.categoriesRepository.update(id, dto);
   }
 
   async remove(id: string, tenantId: string) {
     await this.findById(id, tenantId);
-    const activeProducts = await this.repository.countActiveProducts(id, tenantId);
-    if (activeProducts > 0) {
-      throw new BadRequestException('Cannot delete category with active products');
-    }
-    await this.repository.softDelete(id, tenantId);
-    return { success: true, message: 'Category deleted successfully' };
+    await this.categoriesRepository.softDelete(id);
+    return { message: 'Category deleted successfully' };
   }
 }

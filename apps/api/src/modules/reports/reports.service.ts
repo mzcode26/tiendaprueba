@@ -1,154 +1,329 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { SalesSummary, InventorySummary, CustomerSummary } from './types/report.type';
-
-type InventoryWithVariant = {
-  quantity: number;
-  minStock: number;
-  variant: {
-    price: number | string;
-    product: { id: string; name: string };
-  };
-};
-
-type CustomerWithSales = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  isActive: boolean;
-  sales: Array<{ total: number | string }>;
-};
+import { QueryReportDto, ReportGroupBy } from './dto/query-report.dto';
 
 @Injectable()
 export class ReportsService {
   constructor(private prisma: PrismaService) {}
 
-  async getSalesReport(tenantId: string, filters: {
-    storeId?: string;
-    startDate?: string;
-    endDate?: string;
-  }): Promise<SalesSummary> {
-    const { storeId, startDate, endDate } = filters;
+  // ─── Sales Over Time ───────────────────────────────────────────────────────
 
-    const where = {
-      tenantId,
-      deletedAt: null,
-      ...(storeId && { storeId }),
-      ...(startDate && endDate && {
-        createdAt: {
-          gte: new Date(startDate),
-          lte: new Date(endDate),
-        },
-      }),
+  async getSalesOverTime(tenantId: string, dto: QueryReportDto) {
+    const { storeId, dateFrom, dateTo, groupBy = ReportGroupBy.DAY } = dto;
+
+    const truncMap: Record<ReportGroupBy, string> = {
+      DAY: 'day',
+      WEEK: 'week',
+      MONTH: 'month',
     };
+    const trunc = truncMap[groupBy];
 
-    const sales = await this.prisma.sale.findMany({
-      where,
-      include: {
-        items: true,
-        payments: { where: { status: 'COMPLETED' } },
-      },
-    });
+    const storeFilter = storeId ? `AND s.store_id = '${storeId}'` : '';
+    const dateFromFilter = dateFrom
+      ? `AND s.created_at >= '${new Date(dateFrom).toISOString()}'`
+      : '';
+    const dateToFilter = dateTo
+      ? `AND s.created_at <= '${new Date(dateTo).toISOString()}'`
+      : '';
 
-    const totalSales = sales.length;
-    const totalRevenue = sales.reduce((sum: number, sale: any) => sum + Number(sale.total), 0);
-    const totalItems = sales.reduce((sum: number, sale: any) => sum + sale.items.length, 0);
-
-    const byPaymentMethod = sales
-      .flatMap((sale: any) => sale.payments)
-      .reduce(
-        (
-          acc: Record<string, { count: number; total: number }>,
-          payment: { method: string; amount: number | string }
-        ) => {
-          const method = payment.method;
-          if (!acc[method]) {
-            acc[method] = { count: 0, total: 0 };
-          }
-          acc[method].count += 1;
-          acc[method].total += Number(payment.amount);
-          return acc;
-        },
-        {} as Record<string, { count: number; total: number }>
-      );
-
-    return {
-      totalSales,
-      totalRevenue,
-      totalItems,
-      byPaymentMethod,
-    };
+    return this.prisma.$queryRawUnsafe<
+      Array<{ period: Date; total_sales: bigint; total_revenue: number }>
+    >(`
+      SELECT
+        DATE_TRUNC('${trunc}', s.created_at) AS period,
+        COUNT(s.id)::bigint AS total_sales,
+        COALESCE(SUM(s.total), 0)::float AS total_revenue
+      FROM sales s
+      WHERE s.tenant_id = '${tenantId}'
+        AND s.status = 'COMPLETED'
+        AND s.deleted_at IS NULL
+        ${storeFilter}
+        ${dateFromFilter}
+        ${dateToFilter}
+      GROUP BY period
+      ORDER BY period ASC
+    `);
   }
 
-  async getInventoryReport(tenantId: string, storeId?: string): Promise<InventorySummary> {
-    const where = {
-      tenantId,
-      deletedAt: null,
-      ...(storeId && { storeId }),
-    };
+  // ─── Top Products ──────────────────────────────────────────────────────────
 
-    const inventory = await this.prisma.inventory.findMany({
-      where,
-      include: {
-        variant: {
-          include: {
-            product: { select: { id: true, name: true } },
-          },
-        },
-      },
-    });
+  async getTopProducts(tenantId: string, dto: QueryReportDto) {
+    const { storeId, dateFrom, dateTo, limit = 10 } = dto;
 
-    const totalProducts = inventory.length;
-    const lowStock = inventory.filter((inv: InventoryWithVariant) => inv.quantity <= inv.minStock).length;
-const outOfStock = inventory.filter((inv: InventoryWithVariant) => inv.quantity === 0).length;
-const totalValue = inventory.reduce(
-  (sum: number, inv: InventoryWithVariant) => sum + (inv.quantity * Number(inv.variant.price)),
-  0
-);
+    const storeFilter = storeId ? `AND s.store_id = '${storeId}'` : '';
+    const dateFromFilter = dateFrom
+      ? `AND s.created_at >= '${new Date(dateFrom).toISOString()}'`
+      : '';
+    const dateToFilter = dateTo
+      ? `AND s.created_at <= '${new Date(dateTo).toISOString()}'`
+      : '';
 
-    return {
-      totalProducts,
-      lowStock,
-      outOfStock,
-      totalValue,
-    };
+    return this.prisma.$queryRawUnsafe<
+      Array<{
+        product_id: string;
+        product_name: string;
+        variant_sku: string;
+        total_quantity: bigint;
+        total_revenue: number;
+      }>
+    >(`
+      SELECT
+        p.id AS product_id,
+        p.name AS product_name,
+        v.sku AS variant_sku,
+        SUM(si.quantity)::bigint AS total_quantity,
+        COALESCE(SUM(si.subtotal), 0)::float AS total_revenue
+      FROM sale_items si
+      JOIN product_variants v ON v.id = si.variant_id
+      JOIN products p ON p.id = v.product_id
+      JOIN sales s ON s.id = si.sale_id
+      WHERE s.tenant_id = '${tenantId}'
+        AND s.status = 'COMPLETED'
+        AND s.deleted_at IS NULL
+        ${storeFilter}
+        ${dateFromFilter}
+        ${dateToFilter}
+      GROUP BY p.id, p.name, v.sku
+      ORDER BY total_quantity DESC
+      LIMIT ${limit}
+    `);
   }
 
-  async getCustomerReport(tenantId: string): Promise<CustomerSummary> {
-    const customers = await this.prisma.customer.findMany({
-      where: { tenantId, deletedAt: null },
-      include: {
-        sales: {
-          where: { status: 'COMPLETED' },
-          select: { total: true },
-        },
-      },
-    });
+  // ─── Top Customers ─────────────────────────────────────────────────────────
 
-    const totalCustomers = customers.length;
-    const activeCustomers = customers.filter((c: CustomerWithSales) => c.isActive).length;
-const totalRevenue = customers.reduce(
-  (sum: number, c: CustomerWithSales) => sum + c.sales.reduce(
-    (s: number, sale) => s + Number(sale.total), 0
-  ),
-  0
-);
+  async getTopCustomers(tenantId: string, dto: QueryReportDto) {
+    const { storeId, dateFrom, dateTo, limit = 10 } = dto;
 
-const topCustomers = customers
-  .map((c: CustomerWithSales) => ({
-    id: c.id,
-    name: `${c.firstName} ${c.lastName}`,
-    totalSpent: c.sales.reduce((sum: number, sale) => sum + Number(sale.total), 0),
-    salesCount: c.sales.length,
-  }))
-  .sort((a: { totalSpent: number }, b: { totalSpent: number }) => b.totalSpent - a.totalSpent)
-  .slice(0, 10);
+    const storeFilter = storeId ? `AND s.store_id = '${storeId}'` : '';
+    const dateFromFilter = dateFrom
+      ? `AND s.created_at >= '${new Date(dateFrom).toISOString()}'`
+      : '';
+    const dateToFilter = dateTo
+      ? `AND s.created_at <= '${new Date(dateTo).toISOString()}'`
+      : '';
 
-    return {
+    return this.prisma.$queryRawUnsafe<
+      Array<{
+        customer_id: string;
+        full_name: string;
+        email: string;
+        total_orders: bigint;
+        total_spent: number;
+      }>
+    >(`
+      SELECT
+        c.id AS customer_id,
+        CONCAT(c.first_name, ' ', c.last_name) AS full_name,
+        c.email,
+        COUNT(s.id)::bigint AS total_orders,
+        COALESCE(SUM(s.total), 0)::float AS total_spent
+      FROM sales s
+      JOIN customers c ON c.id = s.customer_id
+      WHERE s.tenant_id = '${tenantId}'
+        AND s.status = 'COMPLETED'
+        AND s.deleted_at IS NULL
+        AND s.customer_id IS NOT NULL
+        ${storeFilter}
+        ${dateFromFilter}
+        ${dateToFilter}
+      GROUP BY c.id, c.first_name, c.last_name, c.email
+      ORDER BY total_spent DESC
+      LIMIT ${limit}
+    `);
+  }
+
+  // ─── Revenue by Category ───────────────────────────────────────────────────
+
+  async getRevenueByCategory(tenantId: string, dto: QueryReportDto) {
+    const { storeId, dateFrom, dateTo } = dto;
+
+    const storeFilter = storeId ? `AND s.store_id = '${storeId}'` : '';
+    const dateFromFilter = dateFrom
+      ? `AND s.created_at >= '${new Date(dateFrom).toISOString()}'`
+      : '';
+    const dateToFilter = dateTo
+      ? `AND s.created_at <= '${new Date(dateTo).toISOString()}'`
+      : '';
+
+    return this.prisma.$queryRawUnsafe<
+      Array<{
+        category_id: string;
+        category_name: string;
+        total_quantity: bigint;
+        total_revenue: number;
+      }>
+    >(`
+      SELECT
+        cat.id AS category_id,
+        cat.name AS category_name,
+        SUM(si.quantity)::bigint AS total_quantity,
+        COALESCE(SUM(si.subtotal), 0)::float AS total_revenue
+      FROM sale_items si
+      JOIN product_variants v ON v.id = si.variant_id
+      JOIN products p ON p.id = v.product_id
+      JOIN categories cat ON cat.id = p.category_id
+      JOIN sales s ON s.id = si.sale_id
+      WHERE s.tenant_id = '${tenantId}'
+        AND s.status = 'COMPLETED'
+        AND s.deleted_at IS NULL
+        ${storeFilter}
+        ${dateFromFilter}
+        ${dateToFilter}
+      GROUP BY cat.id, cat.name
+      ORDER BY total_revenue DESC
+    `);
+  }
+
+  // ─── Revenue by Payment Method ─────────────────────────────────────────────
+
+  async getRevenueByPaymentMethod(tenantId: string, dto: QueryReportDto) {
+    const { storeId, dateFrom, dateTo } = dto;
+
+    const storeFilter = storeId ? `AND s.store_id = '${storeId}'` : '';
+    const dateFromFilter = dateFrom
+      ? `AND s.created_at >= '${new Date(dateFrom).toISOString()}'`
+      : '';
+    const dateToFilter = dateTo
+      ? `AND s.created_at <= '${new Date(dateTo).toISOString()}'`
+      : '';
+
+    return this.prisma.$queryRawUnsafe<
+      Array<{
+        method: string;
+        total_transactions: bigint;
+        total_amount: number;
+      }>
+    >(`
+      SELECT
+        sp.method,
+        COUNT(sp.id)::bigint AS total_transactions,
+        COALESCE(SUM(sp.amount), 0)::float AS total_amount
+      FROM sale_payments sp
+      JOIN sales s ON s.id = sp.sale_id
+      WHERE s.tenant_id = '${tenantId}'
+        AND s.status = 'COMPLETED'
+        AND s.deleted_at IS NULL
+        ${storeFilter}
+        ${dateFromFilter}
+        ${dateToFilter}
+      GROUP BY sp.method
+      ORDER BY total_amount DESC
+    `);
+  }
+
+  // ─── Inventory Valuation ───────────────────────────────────────────────────
+
+  async getInventoryValuation(tenantId: string, storeId?: string) {
+    const storeFilter = storeId ? `AND i.store_id = '${storeId}'` : '';
+
+    return this.prisma.$queryRawUnsafe<
+      Array<{
+        store_name: string;
+        product_name: string;
+        variant_sku: string;
+        quantity: number;
+        cost_price: number;
+        total_value: number;
+      }>
+    >(`
+      SELECT
+        st.name AS store_name,
+        p.name AS product_name,
+        v.sku AS variant_sku,
+        i.quantity,
+        COALESCE(v.cost_price, 0)::float AS cost_price,
+        (i.quantity * COALESCE(v.cost_price, 0))::float AS total_value
+      FROM inventories i
+      JOIN product_variants v ON v.id = i.variant_id
+      JOIN products p ON p.id = v.product_id
+      JOIN stores st ON st.id = i.store_id
+      WHERE i.tenant_id = '${tenantId}'
+        AND p.deleted_at IS NULL
+        AND v.deleted_at IS NULL
+        ${storeFilter}
+      ORDER BY total_value DESC
+    `);
+  }
+
+  // ─── Dashboard Summary ─────────────────────────────────────────────────────
+
+  async getDashboardSummary(tenantId: string, storeId?: string) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const startOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+
+    const storeWhere = storeId ? { storeId } : {};
+
+    const baseWhere = {
+      tenantId,
+      status: 'COMPLETED' as const,
+      deletedAt: null,
+      ...storeWhere,
+    };
+
+    const [
+      todaySales,
+      monthSales,
+      lastMonthSales,
       totalCustomers,
-      activeCustomers,
-      totalRevenue,
-      topCustomers,
+      lowStockCount,
+    ] = await Promise.all([
+      this.prisma.sale.aggregate({
+        where: { ...baseWhere, createdAt: { gte: today } },
+        _sum: { total: true },
+        _count: { id: true },
+      }),
+      this.prisma.sale.aggregate({
+        where: { ...baseWhere, createdAt: { gte: startOfMonth } },
+        _sum: { total: true },
+        _count: { id: true },
+      }),
+      this.prisma.sale.aggregate({
+        where: {
+          ...baseWhere,
+          createdAt: { gte: startOfLastMonth, lte: endOfLastMonth },
+        },
+        _sum: { total: true },
+        _count: { id: true },
+      }),
+      this.prisma.customer.count({
+        where: { tenantId, deletedAt: null, isActive: true },
+      }),
+      this.prisma.$queryRawUnsafe<[{ count: bigint }]>(`
+        SELECT COUNT(*)::bigint as count
+        FROM inventories i
+        WHERE i.tenant_id = '${tenantId}'
+          ${storeId ? `AND i.store_id = '${storeId}'` : ''}
+          AND i.min_stock IS NOT NULL
+          AND i.quantity <= i.min_stock
+      `),
+    ]);
+
+    const monthRevenue = Number(monthSales._sum.total ?? 0);
+    const lastMonthRevenue = Number(lastMonthSales._sum.total ?? 0);
+    const revenueGrowth =
+      lastMonthRevenue > 0
+        ? ((monthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100
+        : 0;
+
+    return {
+      today: {
+        sales: todaySales._count.id,
+        revenue: Number(todaySales._sum.total ?? 0),
+      },
+      currentMonth: {
+        sales: monthSales._count.id,
+        revenue: monthRevenue,
+        revenueGrowth: Math.round(revenueGrowth * 100) / 100,
+      },
+      lastMonth: {
+        sales: lastMonthSales._count.id,
+        revenue: lastMonthRevenue,
+      },
+      totalCustomers,
+      lowStockAlerts: Number(lowStockCount[0]?.count ?? 0),
     };
   }
 }

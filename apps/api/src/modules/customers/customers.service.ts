@@ -1,69 +1,85 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { CustomersRepository } from './customers.repository';
-import { CreateCustomerDto, UpdateCustomerDto, CustomerFiltersDto } from './dto';
+import { CreateCustomerDto } from './dto/create-customer.dto';
+import { UpdateCustomerDto } from './dto/update-customer.dto';
+import { QueryCustomersDto } from './dto/query-customers.dto';
 
 @Injectable()
 export class CustomersService {
-  constructor(private repository: CustomersRepository) {}
+  constructor(private customersRepository: CustomersRepository) {}
 
-  async findAll(tenantId: string, filters: CustomerFiltersDto) {
-    return this.repository.findAll(tenantId, filters);
+  findAll(tenantId: string, query: QueryCustomersDto) {
+    return this.customersRepository.findAll(tenantId, query);
   }
 
-  async findById(tenantId: string, id: string) {
-    return this.repository.findById(id, tenantId);
+  async findById(id: string, tenantId: string) {
+    const customer = await this.customersRepository.findById(id, tenantId);
+    if (!customer) throw new NotFoundException('Customer not found');
+    return customer;
   }
 
-  async create(tenantId: string, data: CreateCustomerDto) {
-    // Check for duplicate email
-    if (data.email) {
-      const existing = await this.repository.findByEmail(data.email, tenantId);
+  async create(tenantId: string, dto: CreateCustomerDto) {
+    if (dto.email) {
+      const existing = await this.customersRepository.findByEmail(
+        dto.email,
+        tenantId,
+      );
       if (existing) {
-        throw new ConflictException('Customer with this email already exists');
+        throw new ConflictException('A customer with this email already exists');
       }
     }
 
-    // Check for duplicate document
-    if (data.documentNumber) {
-      const existing = await this.repository.findByDocument(data.documentNumber, tenantId);
+    if (dto.taxId) {
+      const existing = await this.customersRepository.findByTaxId(
+        dto.taxId,
+        tenantId,
+      );
       if (existing) {
-        throw new ConflictException('Customer with this document number already exists');
+        throw new ConflictException('A customer with this tax ID already exists');
       }
     }
 
-    return this.repository.create(tenantId, data);
+    return this.customersRepository.create(tenantId, dto);
   }
 
-  async update(tenantId: string, id: string, data: UpdateCustomerDto) {
-    // Validate existence
-    await this.findById(tenantId, id);
+  async update(id: string, tenantId: string, dto: UpdateCustomerDto) {
+    await this.findById(id, tenantId);
 
-    // Check duplicates if updating email/document
-    if (data.email) {
-      const existing = await this.repository.findByEmail(data.email, tenantId);
+    if (dto.email) {
+      const existing = await this.customersRepository.findByEmail(
+        dto.email,
+        tenantId,
+      );
       if (existing && existing.id !== id) {
-        throw new ConflictException('Customer with this email already exists');
+        throw new ConflictException('A customer with this email already exists');
       }
     }
 
-    if (data.documentNumber) {
-      const existing = await this.repository.findByDocument(data.documentNumber, tenantId);
+    if (dto.taxId) {
+      const existing = await this.customersRepository.findByTaxId(
+        dto.taxId,
+        tenantId,
+      );
       if (existing && existing.id !== id) {
-        throw new ConflictException('Customer with this document number already exists');
+        throw new ConflictException('A customer with this tax ID already exists');
       }
     }
 
-    return this.repository.update(id, tenantId, data);
+    return this.customersRepository.update(id, dto);
   }
 
-  async remove(tenantId: string, id: string) {
-    // Validate existence
-    await this.findById(tenantId, id);
-
-    return this.repository.softDelete(id, tenantId);
+  async getStats(id: string, tenantId: string) {
+    await this.findById(id, tenantId);
+    return this.customersRepository.getStats(id, tenantId);
   }
 
-  async getTopCustomers(tenantId: string, limit?: number) {
-    return this.repository.getTopCustomers(tenantId, limit);
+  async remove(id: string, tenantId: string) {
+    await this.findById(id, tenantId);
+    await this.customersRepository.softDelete(id);
+    return { message: 'Customer deleted successfully' };
   }
 }

@@ -1,143 +1,186 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { InventoryMovementType } from './types/inventory.type';
 import { InventoryRepository } from './inventory.repository';
-import { AdjustStockDto, TransferStockDto, InventoryFiltersDto, MovementFiltersDto } from './dto/adjust-stock.dto';
+import { AdjustStockDto, AdjustmentType } from './dto/adjust-stock.dto';
+import { TransferStockDto } from './dto/transfer-stock.dto';
+import { UpdateInventorySettingsDto } from './dto/update-inventory-settings.dto';
+import { InventoryMovementType } from '@prisma/client';  // ← nombre correcto
 
 @Injectable()
 export class InventoryService {
   constructor(
-    private readonly repository: InventoryRepository,
-    private readonly prisma: PrismaService,
+    private inventoryRepository: InventoryRepository,
+    private prisma: PrismaService,
   ) {}
 
-  async getInventory(tenantId: string, filters: InventoryFiltersDto) {
-    return this.repository.findAll(tenantId, filters);
+  async getByStore(storeId: string, tenantId: string) {
+    return this.inventoryRepository.findByStore(storeId, tenantId);
   }
 
-  async getStockByVariantAndStore(variantId: string, storeId: string, tenantId: string) {
-    const inventory = await this.repository.findByVariantAndStore(variantId, storeId, tenantId);
-    if (!inventory) {
-      throw new NotFoundException('Inventory not found');
-    }
+  async getByVariantAndStore(variantId: string, storeId: string, tenantId: string) {
+    const inventory = await this.inventoryRepository.findByVariantAndStore(
+      variantId,
+      storeId,
+      tenantId,
+    );
+    if (!inventory) throw new NotFoundException('Inventory record not found');
     return inventory;
   }
 
-  async adjustStock(tenantId: string, userId: string, data: AdjustStockDto) {
-    // Validate store belongs to tenant
-    const store = await this.prisma.store.findFirst({
-      where: { id: data.storeId, tenantId, deletedAt: null },
-    });
-    if (!store) {
-      throw new BadRequestException('Store not found');
+  async getLowStock(tenantId: string) {
+    return this.inventoryRepository.findLowStock(tenantId);
+  }
+
+  async adjustStock(tenantId: string, userId: string, dto: AdjustStockDto) {
+    const current = await this.inventoryRepository.findByVariantAndStore(
+      dto.variantId,
+      dto.storeId,
+      tenantId,
+    );
+
+    const previousQuantity = current?.quantity ?? 0;
+    let newQuantity: number;
+
+    switch (dto.type) {
+      case AdjustmentType.ADD:
+        newQuantity = previousQuantity + dto.quantity;
+        break;
+      case AdjustmentType.REMOVE:
+        newQuantity = previousQuantity - dto.quantity;
+        if (newQuantity < 0) throw new BadRequestException('Insufficient stock');
+        break;
+      case AdjustmentType.SET:
+        if (dto.quantity < 0) throw new BadRequestException('Stock cannot be negative');
+        newQuantity = dto.quantity;
+        break;
+      default:
+        throw new BadRequestException('Invalid adjustment type');
     }
 
-    // Validate variant belongs to tenant
-    const variant = await this.prisma.productVariant.findFirst({
-      where: { id: data.variantId, tenantId, deletedAt: null },
-    });
-    if (!variant) {
-      throw new BadRequestException('Product variant not found');
-    }
+    const movementTypeMap: Record<AdjustmentType, InventoryMovementType> = {
+      [AdjustmentType.ADD]: InventoryMovementType.ADJUSTMENT_IN,
+      [AdjustmentType.REMOVE]: InventoryMovementType.ADJUSTMENT_OUT,
+      [AdjustmentType.SET]: InventoryMovementType.ADJUSTMENT_IN,
+    };
 
-    // Validate manual adjustment types
-    const allowedTypes = [InventoryMovementType.PURCHASE, InventoryMovementType.ADJUSTMENT, InventoryMovementType.RETURN];
-    if (!allowedTypes.includes(data.type)) {
-      throw new BadRequestException('Invalid movement type for manual adjustment');
-    }
+    return this.prisma.$transaction(async () => {
+      // Upsert inventory y obtener el id resultante
+      const inventory = await this.inventoryRepository.upsertInventory(
+        dto.variantId,
+        dto.storeId,
+        tenantId,
+        newQuantity,
+      );
 
-    const inventory = await this.repository.findOrCreateInventory(data.variantId, data.storeId, tenantId);
-    return this.repository.adjustStock(inventory.id, tenantId, {
-      quantity: data.quantity,
-      type: data.type,
-      reason: data.reason,
-      userId,
+      // Ahora pasamos inventoryId en lugar de variantId/storeId
+      await this.inventoryRepository.createMovement({
+        tenantId,
+        inventoryId: inventory.id,
+        type: movementTypeMap[dto.type],
+        quantity: Math.abs(newQuantity - previousQuantity),
+        previousQuantity,
+        newQuantity,
+        reason: dto.reason,
+        referenceId: dto.reference,
+        userId,
+      });
+
+      return inventory;
     });
   }
 
-  async transferStock(tenantId: string, userId: string, data: TransferStockDto) {
-    // Validate stores belong to tenant
-    const [sourceStore, destStore] = await Promise.all([
-      this.prisma.store.findFirst({
-        where: { id: data.sourceStoreId, tenantId, deletedAt: null },
-      }),
-      this.prisma.store.findFirst({
-        where: { id: data.destinationStoreId, tenantId, deletedAt: null },
-      }),
-    ]);
+  async transferStock(tenantId: string, userId: string, dto: TransferStockDto) {
+    const source = await this.inventoryRepository.findByVariantAndStore(
+      dto.variantId,
+      dto.fromStoreId,
+      tenantId,
+    );
 
-    if (!sourceStore || !destStore) {
-      throw new BadRequestException('Store not found');
+    if (!source || source.quantity < dto.quantity) {
+      throw new BadRequestException('Insufficient stock in source store');
     }
 
-    if (data.sourceStoreId === data.destinationStoreId) {
-      throw new BadRequestException('Source and destination stores must be different');
-    }
+    return this.prisma.$transaction(async () => {
+      // Decrement source
+      const updatedSource = await this.inventoryRepository.incrementStock(
+        dto.variantId,
+        dto.fromStoreId,
+        tenantId,
+        -dto.quantity,
+      );
 
-    // Validate variant belongs to tenant
-    const variant = await this.prisma.productVariant.findFirst({
-      where: { id: data.variantId, tenantId, deletedAt: null },
-    });
-    if (!variant) {
-      throw new BadRequestException('Product variant not found');
-    }
+      // Increment destination
+      const updatedDest = await this.inventoryRepository.incrementStock(
+        dto.variantId,
+        dto.toStoreId,
+        tenantId,
+        dto.quantity,
+      );
 
-    return this.repository.transferStock(tenantId, {
-      ...data,
-      userId,
-    });
-  }
+      // Movement OUT — usamos id del inventory source
+      await this.inventoryRepository.createMovement({
+        tenantId,
+        inventoryId: updatedSource.id,
+        type: InventoryMovementType.TRANSFER_OUT,
+        quantity: dto.quantity,
+        previousQuantity: source.quantity,
+        newQuantity: source.quantity - dto.quantity,
+        reason: dto.notes,
+        userId,
+      });
 
-  async getMovements(tenantId: string, filters: MovementFiltersDto) {
-    return this.repository.findMovements(tenantId, filters);
-  }
+      // Movement IN — usamos id del inventory destino
+      const destPreviousQty = (updatedDest.quantity) - dto.quantity; // antes del increment
+      await this.inventoryRepository.createMovement({
+        tenantId,
+        inventoryId: updatedDest.id,
+        type: InventoryMovementType.TRANSFER_IN,
+        quantity: dto.quantity,
+        previousQuantity: destPreviousQty,
+        newQuantity: updatedDest.quantity,
+        reason: dto.notes,
+        userId,
+      });
 
-  async getLowStockAlerts(tenantId: string, storeId?: string) {
-    return this.repository.getLowStockAlerts(tenantId, storeId);
-  }
-
-  async setInitialStock(tenantId: string, userId: string, data: { variantId: string; storeId: string; quantity: number }) {
-    // Validate store and variant
-    const [store, variant] = await Promise.all([
-      this.prisma.store.findFirst({
-        where: { id: data.storeId, tenantId, deletedAt: null },
-      }),
-      this.prisma.productVariant.findFirst({
-        where: { id: data.variantId, tenantId, deletedAt: null },
-      }),
-    ]);
-
-    if (!store || !variant) {
-      throw new BadRequestException('Store or variant not found');
-    }
-
-    const inventory = await this.repository.findOrCreateInventory(data.variantId, data.storeId, tenantId);
-
-    // Check if already has movements
-    const existingMovements = await this.prisma.inventoryMovement.count({
-      where: { inventoryId: inventory.id },
-    });
-
-    if (existingMovements > 0) {
-      throw new BadRequestException('Stock already initialized for this variant and store');
-    }
-
-    return this.repository.adjustStock(inventory.id, tenantId, {
-      quantity: data.quantity,
-      type: InventoryMovementType.INITIAL,
-      userId,
+      return { message: 'Transfer completed successfully' };
     });
   }
 
-  async updateStockLimits(tenantId: string, inventoryId: string, data: { minStock: number; maxStock?: number }) {
-    // Validate inventory belongs to tenant
-    const inventory = await this.prisma.inventory.findFirst({
-      where: { id: inventoryId, tenantId, deletedAt: null },
-    });
-    if (!inventory) {
-      throw new NotFoundException('Inventory not found');
-    }
+  async updateSettings(
+    variantId: string,
+    storeId: string,
+    tenantId: string,
+    dto: UpdateInventorySettingsDto,
+  ) {
+    const inventory = await this.inventoryRepository.findByVariantAndStore(
+      variantId,
+      storeId,
+      tenantId,
+    );
+    if (!inventory) throw new NotFoundException('Inventory record not found');
 
-    return this.repository.updateMinMaxStock(inventoryId, tenantId, data);
+    return this.inventoryRepository.updateSettings(
+      variantId,
+      storeId,
+      dto.minStock,
+      dto.maxStock,
+    );
+  }
+
+  async getMovements(
+    tenantId: string,
+    filters: {
+      variantId?: string;
+      storeId?: string;
+      type?: InventoryMovementType;
+      page?: number;
+      limit?: number;
+    },
+  ) {
+    return this.inventoryRepository.findMovements(tenantId, filters);
   }
 }

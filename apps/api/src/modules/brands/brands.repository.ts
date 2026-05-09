@@ -1,31 +1,26 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CreateBrandDto } from './dto/create-brand.dto';
+import { UpdateBrandDto } from './dto/update-brand.dto';
+
+function toSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
 
 @Injectable()
 export class BrandsRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {}
 
-  async findAll(tenantId: string, filters: { page: number; limit: number; search?: string }) {
-    const where: any = {
-      tenantId,
-      deletedAt: null,
-    };
-
-    if (filters.search) {
-      where.name = { contains: filters.search, mode: 'insensitive' };
-    }
-
-    const [total, data] = await Promise.all([
-      this.prisma.brand.count({ where }),
-      this.prisma.brand.findMany({
-        where,
-        skip: (filters.page - 1) * filters.limit,
-        take: filters.limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-    ]);
-
-    return { data, total };
+  async findAll(tenantId: string) {
+    return this.prisma.brand.findMany({
+      where: { tenantId, deletedAt: null },
+      orderBy: { name: 'asc' },
+    });
   }
 
   async findById(id: string, tenantId: string) {
@@ -40,40 +35,29 @@ export class BrandsRepository {
     });
   }
 
-  async create(tenantId: string, data: any) {
+  async create(tenantId: string, dto: CreateBrandDto) {
+    const slug = toSlug(dto.name);
     return this.prisma.brand.create({
       data: {
         tenantId,
-        name: data.name,
-        slug: data.slug,
-        description: data.description,
-        logoUrl: data.logoUrl,
+        name: dto.name,
+        slug,
+        description: dto.description,
+        logoUrl: dto.logoUrl,
       },
     });
   }
 
-  async update(id: string, _tenantId: string, data: any) {
-    return this.prisma.brand.update({
-      where: { id },
-      data: {
-        name: data.name,
-        slug: data.slug,
-        description: data.description,
-        logoUrl: data.logoUrl,
-      },
-    });
+  async update(id: string, dto: UpdateBrandDto) {
+    const data: Record<string, unknown> = { ...dto };
+    if (dto.name) data.slug = toSlug(dto.name);
+    return this.prisma.brand.update({ where: { id }, data });
   }
 
-  async softDelete(id: string, _tenantId: string) {
+  async softDelete(id: string) {
     return this.prisma.brand.update({
       where: { id },
       data: { deletedAt: new Date() },
-    });
-  }
-
-  async countActiveProducts(id: string, tenantId: string) {
-    return this.prisma.product.count({
-      where: { brandId: id, tenantId, deletedAt: null, isActive: true },
     });
   }
 }

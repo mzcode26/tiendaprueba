@@ -1,127 +1,122 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+} from '@nestjs/common';
 import { ProductsService } from './products.service';
-import { CreateProductDto } from './dto/create-product.dto';
-import { UpdateProductDto } from './dto/update-product.dto';
+import { CreateProductDto, CreateProductVariantDto } from './dto/create-product.dto';
+import { UpdateProductDto, UpdateProductVariantDto } from './dto/update-product.dto';
 import { CreateProductImageDto } from './dto/create-product-image.dto';
-import { UpdateInventoryDto } from './dto/update-inventory.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { PermissionsGuard } from '../auth/guards/permissions.guard';
-import { RequirePermissions } from '../auth/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { RequirePermissions } from '../auth/decorators/require-permissions.decorator';
+import type { JwtPayload } from '../auth/types/jwt-payload.type';
 
 @Controller('products')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ProductsController {
-  constructor(private readonly service: ProductsService) {}
+  constructor(private readonly productsService: ProductsService) {}
 
   @Get()
   @RequirePermissions('view_products')
-  async findAll(
-    @CurrentUser('tenantId') tenantId: string,
-    @Query('page') page = '1',
-    @Query('limit') limit = '20',
+  findAll(
+    @CurrentUser() user: JwtPayload,
     @Query('search') search?: string,
     @Query('categoryId') categoryId?: string,
     @Query('brandId') brandId?: string,
     @Query('isActive') isActive?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.service.findAll(tenantId, {
-      page: Number(page),
-      limit: Number(limit),
+    return this.productsService.findAll(user.tenantId, {
       search,
       categoryId,
       brandId,
-      isActive: isActive ? isActive === 'true' : undefined,
+      isActive: isActive !== undefined ? isActive === 'true' : undefined,
+      page: page ? parseInt(page) : 1,
+      limit: limit ? parseInt(limit) : 20,
     });
   }
 
   @Get(':id')
   @RequirePermissions('view_products')
-  async findOne(@CurrentUser('tenantId') tenantId: string, @Param('id') id: string) {
-    return this.service.findById(id, tenantId);
+  findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.productsService.findById(id, user.tenantId);
   }
 
   @Post()
   @RequirePermissions('create_products')
-  async create(@CurrentUser('tenantId') tenantId: string, @Body() data: CreateProductDto) {
-    return this.service.create(tenantId, data);
+  create(@Body() dto: CreateProductDto, @CurrentUser() user: JwtPayload) {
+    return this.productsService.create(user.tenantId, dto);
   }
 
   @Patch(':id')
   @RequirePermissions('edit_products')
-  async update(
-    @CurrentUser('tenantId') tenantId: string,
+  update(
     @Param('id') id: string,
-    @Body() data: UpdateProductDto,
+    @Body() dto: UpdateProductDto,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.service.update(id, tenantId, data);
+    return this.productsService.update(id, user.tenantId, dto);
   }
 
   @Delete(':id')
   @RequirePermissions('delete_products')
-  async remove(@CurrentUser('tenantId') tenantId: string, @Param('id') id: string) {
-    return this.service.remove(id, tenantId);
+  remove(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.productsService.remove(id, user.tenantId);
   }
 
-  @Patch(':id/inventory')
+  @Post(':id/variants')
   @RequirePermissions('edit_products')
-  async updateInventory(
-    @CurrentUser('tenantId') tenantId: string,
+  addVariant(
     @Param('id') id: string,
-    @Body() data: UpdateInventoryDto,
+    @Body() dto: CreateProductVariantDto,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.service.updateInventory(id, tenantId, data.quantity);
+    return this.productsService.addVariant(id, user.tenantId, dto);
+  }
+
+  @Patch(':id/variants/:variantId')
+  @RequirePermissions('edit_products')
+  updateVariant(
+    @Param('id') id: string,
+    @Param('variantId') variantId: string,
+    @Body() dto: UpdateProductVariantDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.productsService.updateVariant(id, variantId, user.tenantId, dto);
+  }
+
+  @Delete(':id/variants/:variantId')
+  @RequirePermissions('edit_products')
+  removeVariant(
+    @Param('id') id: string,
+    @Param('variantId') variantId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.productsService.removeVariant(id, variantId, user.tenantId);
   }
 
   @Post(':id/images')
   @RequirePermissions('edit_products')
-  async addImage(
-    @CurrentUser('tenantId') tenantId: string,
-    @Param('id') productId: string,
-    @Body() data: CreateProductImageDto,
+  addImage(
+    @Param('id') id: string,
+    @Body() dto: CreateProductImageDto,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.service.addImage(productId, tenantId, data);
-  }
-
-  @Patch(':id/images/:imageId/sort')
-  @RequirePermissions('edit_products')
-  async updateImageSortOrder(
-    @CurrentUser('tenantId') tenantId: string,
-    @Param('id') productId: string,
-    @Param('imageId') imageId: string,
-    @Body('sortOrder') sortOrder: number,
-  ) {
-    return this.service.updateImageSortOrder(productId, imageId, tenantId, sortOrder);
+    return this.productsService.addImage(id, user.tenantId, dto);
   }
 
   @Delete(':id/images/:imageId')
   @RequirePermissions('edit_products')
-  async removeImage(
-    @CurrentUser('tenantId') tenantId: string,
-    @Param('id') productId: string,
+  removeImage(
+    @Param('id') id: string,
     @Param('imageId') imageId: string,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.service.removeImage(productId, imageId, tenantId);
-  }
-
-  @Get(':id/variants/:variantId')
-  @RequirePermissions('view_products')
-  async findVariant(
-    @CurrentUser('tenantId') tenantId: string,
-    @Param('id') _productId: string,
-    @Param('variantId') variantId: string,
-  ) {
-    return this.service.findVariantById(variantId, tenantId);
-  }
-
-  @Patch(':id/variants/:variantId/inventory')
-  @RequirePermissions('edit_products')
-  async updateVariantInventory(
-    @CurrentUser('tenantId') tenantId: string,
-    @Param('id') _productId: string,
-    @Param('variantId') variantId: string,
-    @Body() data: UpdateInventoryDto,
-  ) {
-    return this.service.updateVariantInventory(variantId, tenantId, data.quantity);
+    return this.productsService.removeImage(id, imageId, user.tenantId);
   }
 }

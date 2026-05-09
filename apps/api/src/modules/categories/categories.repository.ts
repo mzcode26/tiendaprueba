@@ -1,49 +1,35 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CreateCategoryDto } from './dto/create-category.dto';
+import { UpdateCategoryDto } from './dto/update-category.dto';
+
+function toSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
 
 @Injectable()
 export class CategoriesRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {}
 
-  async findAll(
-    tenantId: string,
-    filters: { page: number; limit: number; search?: string; parentId?: string | null },
-  ) {
-    const where: any = {
-      tenantId,
-      deletedAt: null,
-    };
-
-    if (filters.search) {
-      where.name = { contains: filters.search, mode: 'insensitive' };
-    }
-
-    if (filters.parentId !== undefined) {
-      where.parentId = filters.parentId;
-    }
-
-    const [total, data] = await Promise.all([
-      this.prisma.category.count({ where }),
-      this.prisma.category.findMany({
-        where,
-        skip: (filters.page - 1) * filters.limit,
-        take: filters.limit,
-        include: {
-          _count: { select: { products: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-      }),
-    ]);
-
-    return { data, total };
+  async findAll(tenantId: string) {
+    return this.prisma.category.findMany({
+      where: { tenantId, deletedAt: null },
+      include: { children: { where: { deletedAt: null } } },
+      orderBy: { name: 'asc' },
+    });
   }
 
   async findById(id: string, tenantId: string) {
     return this.prisma.category.findFirst({
       where: { id, tenantId, deletedAt: null },
       include: {
-        children: { where: { deletedAt: null } },
         parent: true,
+        children: { where: { deletedAt: null } },
       },
     });
   }
@@ -54,42 +40,30 @@ export class CategoriesRepository {
     });
   }
 
-  async create(tenantId: string, data: any) {
+  async create(tenantId: string, dto: CreateCategoryDto) {
+    const slug = toSlug(dto.name);
     return this.prisma.category.create({
       data: {
         tenantId,
-        name: data.name,
-        slug: data.slug,
-        description: data.description,
-        parentId: data.parentId,
-        imageUrl: data.imageUrl,
+        name: dto.name,
+        slug,
+        description: dto.description,
+        parentId: dto.parentId,
+        imageUrl: dto.imageUrl,
       },
     });
   }
 
-  async update(id: string, _tenantId: string, data: any) {
-    return this.prisma.category.update({
-      where: { id },
-      data: {
-        name: data.name,
-        slug: data.slug,
-        description: data.description,
-        parentId: data.parentId,
-        imageUrl: data.imageUrl,
-      },
-    });
+  async update(id: string, dto: UpdateCategoryDto) {
+    const data: Record<string, unknown> = { ...dto };
+    if (dto.name) data.slug = toSlug(dto.name);
+    return this.prisma.category.update({ where: { id }, data });
   }
 
-  async softDelete(id: string, _tenantId: string) {
+  async softDelete(id: string) {
     return this.prisma.category.update({
       where: { id },
       data: { deletedAt: new Date() },
-    });
-  }
-
-  async countActiveProducts(id: string, tenantId: string) {
-    return this.prisma.product.count({
-      where: { categoryId: id, tenantId, deletedAt: null, isActive: true },
     });
   }
 }

@@ -1,34 +1,37 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { StoresRepository } from './stores.repository';
+import { CreateStoreDto } from './dto/create-store.dto';
+import { UpdateStoreDto } from './dto/update-store.dto';
 
 @Injectable()
 export class StoresService {
-  constructor(private readonly repository: StoresRepository) {}
+  constructor(private storesRepository: StoresRepository) {}
 
-  async findAll(tenantId: string, page: number = 1, limit: number = 20, search?: string) {
-    return this.repository.findAll(tenantId, { page, limit, search });
+  async findAll(tenantId: string, includeInactive = false) {
+    return this.storesRepository.findAll(tenantId, includeInactive);
   }
 
   async findById(id: string, tenantId: string) {
-    const store = await this.repository.findById(id, tenantId);
-    if (!store) {
-      throw new NotFoundException('Store not found');
-    }
+    const store = await this.storesRepository.findById(id, tenantId);
+    if (!store) throw new NotFoundException('Store not found');
     return store;
   }
 
-  async create(tenantId: string, data: any) {
-    return this.repository.create(tenantId, data);
+  async create(tenantId: string, dto: CreateStoreDto) {
+    return this.storesRepository.create(tenantId, dto);
   }
 
-  async update(id: string, tenantId: string, data: any) {
+  async update(id: string, tenantId: string, dto: UpdateStoreDto) {
     await this.findById(id, tenantId);
-    return this.repository.update(id, tenantId, data);
+    return this.storesRepository.update(id, dto);
   }
 
   async remove(id: string, tenantId: string) {
     await this.findById(id, tenantId);
-    await this.repository.softDelete(id, tenantId);
-    return { success: true, message: 'Store deleted successfully' };
+    await this.storesRepository.softDelete(id);
+    return { message: 'Store deleted successfully' };
   }
 }

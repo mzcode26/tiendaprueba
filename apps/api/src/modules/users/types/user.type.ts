@@ -1,15 +1,15 @@
-export type UserRoleType = {
-  id: string;
-  name: string;
-};
+export interface PaginatedResult<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
 
-export type UserType = {
-  id: string;
-  tenantId: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  isActive: boolean;
-  lastLoginAt?: Date | null;
-  roles: UserRoleType[];
-};
+export interface UserFilters {
+  search?: string;
+  isActive?: boolean;
+  roleId?: string;
+  page?: number;
+  limit?: number;
+}

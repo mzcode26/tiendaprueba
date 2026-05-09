@@ -9,21 +9,21 @@ import type { JwtPayload } from '../auth/types/jwt-payload.type';
 export class FilesController {
   constructor(private service: FilesService) {}
 
-  @Post('upload')
-  @UseInterceptors(FileInterceptor('file'))
-  @RequirePermissions('create_files')
-  async uploadFile(
-    @CurrentUser() user: JwtPayload,
-    @UploadedFile() file: Express.Multer.File,
-  ) {
-    const result = await this.service.uploadFile(file, `tienda/${user.tenantId}`);
-    return { success: true, data: result };
-  }
+ @Post('upload')
+@UseInterceptors(FileInterceptor('file'))
+@RequirePermissions('create_files')
+async uploadFile(
+  @CurrentUser() user: JwtPayload,
+  @UploadedFile() file: Express.Multer.File,
+) {
+  const result = await this.service.uploadFile(file, `tienda/${user.tenantId}`);
+  return { success: true, data: result };
+}
 
   @Delete(':publicId')
   @RequirePermissions('delete_files')
   async deleteFile(
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() _user: JwtPayload,
     @Param('publicId') publicId: string,
   ) {
     await this.service.deleteFile(publicId);

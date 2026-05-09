@@ -1,23 +1,18 @@
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
-
-export class CreateAttributeDto {
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(100)
-  name!: string;
-
-  @IsOptional()
-  @IsString()
-  slug?: string;
-}
+import { IsString, IsOptional, IsArray, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateAttributeValueDto {
   @IsString()
-  @IsNotEmpty()
-  @MaxLength(100)
-  value!: string;
+  value: string;
+}
+
+export class CreateAttributeDto {
+  @IsString()
+  name: string;
 
   @IsOptional()
-  @IsString()
-  slug?: string;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateAttributeValueDto)
+  values?: CreateAttributeValueDto[];
 }

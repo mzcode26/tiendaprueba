@@ -5,40 +5,22 @@ import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
 import { JwtPayload } from '../types/jwt-payload.type';
 
-const extractRefreshToken = (req: Request): string | null => {
-  const header = req.headers.authorization;
-  if (header && typeof header === 'string' && header.startsWith('Bearer ')) {
-    return header.split(' ')[1];
-  }
-  return req.body?.refreshToken ?? null;
-};
-
 @Injectable()
 export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
-  constructor(configService: ConfigService) {
+  constructor(_configService: ConfigService) {
     super({
-      jwtFromRequest: ExtractJwt.fromExtractors([extractRefreshToken]),
-      secretOrKey: configService.get<string>('JWT_REFRESH_SECRET'),
+      jwtFromRequest: ExtractJwt.fromBodyField('refreshToken'),
       ignoreExpiration: false,
+      secretOrKey: _configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
       passReqToCallback: true,
     });
   }
 
-  async validate(req: Request, payload: JwtPayload) {
-    if (payload.type !== 'refresh') {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-
-    const refreshToken = extractRefreshToken(req);
+  validate(req: Request, payload: JwtPayload): JwtPayload & { refreshToken: string } {
+    const refreshToken = req.body?.refreshToken as string;
     if (!refreshToken) {
-      throw new UnauthorizedException('Refresh token missing');
+      throw new UnauthorizedException('Refresh token not found');
     }
-
-    return {
-      userId: payload.sub,
-      email: payload.email,
-      tenantId: payload.tenantId,
-      refreshToken,
-    };
+    return { ...payload, refreshToken };
   }
 }

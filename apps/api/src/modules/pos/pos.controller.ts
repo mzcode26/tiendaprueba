@@ -1,41 +1,52 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Query,
+  Param,
+} from '@nestjs/common';
 import { PosService } from './pos.service';
-import { PosSearchDto, QuickSaleDto } from './dto/index';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { PermissionsGuard } from '../auth/guards/permissions.guard';
-import { RequirePermissions } from '../auth/decorators/require-permissions.decorator';
+import { CreateSaleDto } from '../sales/dto/create-sale.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { RequirePermissions } from '../auth/decorators/require-permissions.decorator';
+import type { JwtPayload } from '../auth/types/jwt-payload.type';
 
 @Controller('pos')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class PosController {
-  constructor(private readonly service: PosService) {}
-
-  @Get('data')
-  @RequirePermissions('view_pos')
-  async getPosData(
-    @CurrentUser('tenantId') tenantId: string,
-    @Query('storeId') storeId: string,
-  ) {
-    return this.service.getPosData(tenantId, storeId);
-  }
+  constructor(private readonly posService: PosService) {}
 
   @Get('search')
-  @RequirePermissions('view_pos')
-  async searchProducts(
-    @CurrentUser('tenantId') tenantId: string,
-    @Query() query: PosSearchDto,
+  @RequirePermissions('create_sales')
+  searchProducts(
+    @CurrentUser() user: JwtPayload,
+    @Query('q') query: string,
+    @Query('storeId') storeId: string,
   ) {
-    return this.service.searchProducts(tenantId, query);
+    return this.posService.searchProducts(user.tenantId, { q: query, storeId });
+  }
+
+  @Get('store/:storeId/summary')
+  @RequirePermissions('view_inventory')
+  getStoreSummary(
+    @Param('storeId') storeId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.posService.getStoreInventorySummary(user.tenantId, storeId);
+  }
+
+  @Get('store/:storeId/daily-summary')
+  @RequirePermissions('view_reports')
+  getDailySummary(
+    @Param('storeId') storeId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.posService.getDailySummary(user.tenantId, storeId);
   }
 
   @Post('quick-sale')
   @RequirePermissions('create_sales')
-  async quickSale(
-    @CurrentUser('tenantId') tenantId: string,
-    @CurrentUser('userId') userId: string,
-    @Body() data: QuickSaleDto,
-  ) {
-    return this.service.quickSale(tenantId, userId, data);
+  quickSale(@Body() dto: CreateSaleDto, @CurrentUser() user: JwtPayload) {
+    return this.posService.quickSale(user.tenantId, user.sub, dto);
   }
 }

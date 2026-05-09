@@ -1,443 +1,199 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { PrismaClient } from '@prisma/client';
-import { InventoryMovementType } from './types/inventory.type';
+import { InventoryMovementType } from '@prisma/client';
 
 @Injectable()
 export class InventoryRepository {
-  constructor(private readonly prisma: PrismaService) {}
-
-  async findAll(tenantId: string, filters: {
-    page?: number;
-    limit?: number;
-    storeId?: string;
-    variantId?: string;
-    productId?: string;
-    lowStock?: boolean;
-  }) {
-    const where: any = {
-      tenantId,
-      deletedAt: null,
-    };
-
-    if (filters.storeId) {
-      where.storeId = filters.storeId;
-    }
-
-    if (filters.variantId) {
-      where.variantId = filters.variantId;
-    }
-
-    if (filters.productId) {
-      where.variant = {
-        productId: filters.productId,
-      };
-    }
-
-    if (filters.lowStock) {
-      where.quantity = {
-        lte: this.prisma.inventory.fields.minStock,
-      };
-    }
-
-    const page = filters.page || 1;
-    const limit = filters.limit || 20;
-
-    const [total, data] = await Promise.all([
-      this.prisma.inventory.count({ where }),
-      this.prisma.inventory.findMany({
-        where,
-        skip: (page - 1) * limit,
-        take: limit,
-        include: {
-          variant: {
-            include: {
-              product: { select: { id: true, name: true, slug: true } },
-              attributes: {
-                include: {
-                  attributeValue: { select: { value: true } },
-                },
-              },
-            },
-          },
-          store: { select: { id: true, name: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-      }),
-    ]);
-
-    return { data, total };
-  }
+  constructor(private prisma: PrismaService) {}
 
   async findByVariantAndStore(variantId: string, storeId: string, tenantId: string) {
     return this.prisma.inventory.findFirst({
-      where: {
-        variantId,
-        storeId,
-        tenantId,
-        deletedAt: null,
-      },
+      where: { variantId, storeId, tenantId },
       include: {
-        variant: true,
+        variant: {
+          include: {
+            product: { select: { id: true, name: true, slug: true } },
+            attributes: {
+              include: { attribute: true, attributeValue: true },
+            },
+          },
+        },
         store: true,
       },
     });
   }
 
-  async findOrCreateInventory(variantId: string, storeId: string, tenantId: string) {
-    let inventory = await this.findByVariantAndStore(variantId, storeId, tenantId);
-    if (!inventory) {
-      inventory = await this.prisma.inventory.create({
-        data: {
-          tenantId,
-          variantId,
-          storeId,
-          quantity: 0,
-          reservedQuantity: 0,
-          minStock: 0,
-        },
-        include: {
-          variant: true,
-          store: true,
-        },
-      });
+  async findByStore(storeId: string, tenantId: string, lowStockOnly = false) {
+    if (lowStockOnly) {
+      const allLow = await this.findLowStock(tenantId);
+      return allLow.filter((r) => r.storeId === storeId);
     }
-    return inventory;
-  }
 
-  async getStockLevel(variantId: string, storeId: string, tenantId: string) {
-    const inventory = await this.findByVariantAndStore(variantId, storeId, tenantId);
-    if (!inventory) {
-      return { quantity: 0, reservedQuantity: 0, availableQuantity: 0 };
-    }
-    return {
-      quantity: inventory.quantity,
-      reservedQuantity: inventory.reservedQuantity,
-      availableQuantity: inventory.quantity - inventory.reservedQuantity,
-    };
-  }
-
-  async getTotalStockByVariant(variantId: string, tenantId: string) {
-    const inventories = await this.prisma.inventory.findMany({
-      where: {
-        variantId,
-        tenantId,
-        deletedAt: null,
-      },
+    return this.prisma.inventory.findMany({
+      where: { storeId, tenantId },
       include: {
-        store: { select: { id: true, name: true } },
-      },
-    });
-
-    const total = inventories.reduce((sum: number, inv: any) => sum + inv.quantity, 0);
-    const byStore = inventories.map((inv: any) => ({
-      storeId: inv.storeId,
-      storeName: inv.store.name,
-      quantity: inv.quantity,
-    }));
-
-    return { total, byStore };
-  }
-
-  async adjustStock(
-    inventoryId: string,
-    tenantId: string,
-    data: {
-      quantity: number;
-      type: InventoryMovementType;
-      reason?: string;
-      referenceId?: string;
-      referenceType?: string;
-      userId?: string;
-    },
-  ) {
-    return this.prisma.$transaction(async (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => {
-      const inventory = await tx.inventory.findUnique({
-        where: { id: inventoryId },
-      });
-
-      if (!inventory) {
-        throw new Error('Inventory not found');
-      }
-
-      const newQuantity = inventory.quantity + data.quantity;
-      if (newQuantity < 0) {
-        throw new Error('Insufficient stock');
-      }
-
-      const updatedInventory = await tx.inventory.update({
-        where: { id: inventoryId },
-        data: { quantity: newQuantity },
-        include: {
-          variant: {
-            include: {
-              product: { select: { id: true, name: true } },
+        variant: {
+          include: {
+            product: { select: { id: true, name: true, slug: true, images: { take: 1 } } },
+            attributes: {
+              include: { attribute: true, attributeValue: true },
             },
           },
-          store: { select: { id: true, name: true } },
         },
-      });
-
-      const movement = await tx.inventoryMovement.create({
-        data: {
-          tenantId,
-          inventoryId,
-          type: data.type,
-          quantity: Math.abs(data.quantity),
-          previousQuantity: inventory.quantity,
-          newQuantity,
-          reason: data.reason,
-          referenceId: data.referenceId,
-          referenceType: data.referenceType,
-          userId: data.userId,
-        },
-      });
-
-      return { inventory: updatedInventory, movement };
+        store: true,
+      },
+      orderBy: { updatedAt: 'desc' },
     });
   }
 
-  async transferStock(
+  async findLowStock(tenantId: string) {
+    return this.prisma.$queryRaw<
+      Array<{
+        id: string;
+        variantId: string;
+        storeId: string;
+        quantity: number;
+        minStock: number;
+        sku: string;
+        product_name: string;
+        store_name: string;
+      }>
+    >`
+      SELECT i.id, i.variant_id as "variantId", i.store_id as "storeId",
+             i.quantity, i.min_stock as "minStock",
+             v.sku, p.name as product_name, s.name as store_name
+      FROM inventory i
+      JOIN product_variants v ON v.id = i.variant_id
+      JOIN products p ON p.id = v.product_id
+      JOIN stores s ON s.id = i.store_id
+      WHERE i.tenant_id = ${tenantId}
+        AND i.min_stock IS NOT NULL
+        AND i.quantity <= i.min_stock
+        AND p.deleted_at IS NULL
+        AND v.deleted_at IS NULL
+      ORDER BY (i.quantity - i.min_stock) ASC
+    `;
+  }
+
+  async upsertInventory(
+    variantId: string,
+    storeId: string,
     tenantId: string,
-    data: {
-      variantId: string;
-      sourceStoreId: string;
-      destinationStoreId: string;
-      quantity: number;
-      reason?: string;
-      userId?: string;
-    },
+    quantity: number,
+    minStock?: number,
+    maxStock?: number,
   ) {
-    const transferId = `transfer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-    return this.prisma.$transaction(async (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => {
-      // Find or create source inventory
-      let sourceInventory = await tx.inventory.findFirst({
-        where: {
-          variantId: data.variantId,
-          storeId: data.sourceStoreId,
-          tenantId,
-          deletedAt: null,
-        },
-      });
-
-      if (!sourceInventory) {
-        sourceInventory = await tx.inventory.create({
-          data: {
-            tenantId,
-            variantId: data.variantId,
-            storeId: data.sourceStoreId,
-            quantity: 0,
-            reservedQuantity: 0,
-            minStock: 0,
-          },
-        });
-      }
-
-      if (sourceInventory.quantity < data.quantity) {
-        throw new Error('Insufficient stock in source store');
-      }
-
-      // Find or create destination inventory
-      let destInventory = await tx.inventory.findFirst({
-        where: {
-          variantId: data.variantId,
-          storeId: data.destinationStoreId,
-          tenantId,
-          deletedAt: null,
-        },
-      });
-
-      if (!destInventory) {
-        destInventory = await tx.inventory.create({
-          data: {
-            tenantId,
-            variantId: data.variantId,
-            storeId: data.destinationStoreId,
-            quantity: 0,
-            reservedQuantity: 0,
-            minStock: 0,
-          },
-        });
-      }
-
-      // Update source
-      const newSourceQuantity = sourceInventory.quantity - data.quantity;
-      await tx.inventory.update({
-        where: { id: sourceInventory.id },
-        data: { quantity: newSourceQuantity },
-      });
-
-      // Update destination
-      const newDestQuantity = destInventory.quantity + data.quantity;
-      await tx.inventory.update({
-        where: { id: destInventory.id },
-        data: { quantity: newDestQuantity },
-      });
-
-      // Create movements
-      await tx.inventoryMovement.create({
-        data: {
-          tenantId,
-          inventoryId: sourceInventory.id,
-          type: InventoryMovementType.TRANSFER_OUT,
-          quantity: data.quantity,
-          previousQuantity: sourceInventory.quantity,
-          newQuantity: newSourceQuantity,
-          reason: data.reason,
-          referenceId: transferId,
-          referenceType: 'transfer',
-          userId: data.userId,
-        },
-      });
-
-      await tx.inventoryMovement.create({
-        data: {
-          tenantId,
-          inventoryId: destInventory.id,
-          type: InventoryMovementType.TRANSFER_IN,
-          quantity: data.quantity,
-          previousQuantity: destInventory.quantity,
-          newQuantity: newDestQuantity,
-          reason: data.reason,
-          referenceId: transferId,
-          referenceType: 'transfer',
-          userId: data.userId,
-        },
-      });
-
-      return {
-        source: { inventoryId: sourceInventory.id, newQuantity: newSourceQuantity },
-        destination: { inventoryId: destInventory.id, newQuantity: newDestQuantity },
-        transferId,
-      };
+    return this.prisma.inventory.upsert({
+      where: { variantId_storeId: { variantId, storeId } },
+      create: { variantId, storeId, tenantId, quantity, minStock, maxStock },
+      update: {
+        quantity,
+        ...(minStock !== undefined && { minStock }),
+        ...(maxStock !== undefined && { maxStock }),
+      },
     });
   }
 
-  async findMovements(tenantId: string, filters: {
-    page?: number;
-    limit?: number;
-    inventoryId?: string;
-    variantId?: string;
-    storeId?: string;
-    type?: InventoryMovementType;
-    startDate?: string;
-    endDate?: string;
+  async incrementStock(
+    variantId: string,
+    storeId: string,
+    tenantId: string,
+    delta: number,
+  ) {
+    return this.prisma.inventory.upsert({
+      where: { variantId_storeId: { variantId, storeId } },
+      create: { variantId, storeId, tenantId, quantity: Math.max(0, delta) },
+      update: { quantity: { increment: delta } },
+    });
+  }
+
+  async updateSettings(
+    variantId: string,
+    storeId: string,
+    minStock?: number,
+    maxStock?: number,
+  ) {
+    return this.prisma.inventory.update({
+      where: { variantId_storeId: { variantId, storeId } },
+      data: {
+        ...(minStock !== undefined && { minStock }),
+        ...(maxStock !== undefined && { maxStock }),
+      },
+    });
+  }
+
+  async createMovement(params: {
+    tenantId: string;
+    inventoryId: string;           // ← ahora recibe inventoryId directamente
+    type: InventoryMovementType;
+    quantity: number;
+    previousQuantity: number;
+    newQuantity: number;
+    reason?: string;
+    referenceId?: string;
     userId?: string;
   }) {
-    const where: any = {
-      tenantId,
-      deletedAt: null,
-    };
+    return this.prisma.inventoryMovement.create({
+      data: {
+        tenantId: params.tenantId,
+        inventory: { connect: { id: params.inventoryId } },  // ← connect en lugar de campo directo
+        type: params.type,
+        quantity: params.quantity,
+        previousQuantity: params.previousQuantity,
+        newQuantity: params.newQuantity,
+        reason: params.reason,
+        referenceId: params.referenceId,
+        userId: params.userId,
+      },
+    });
+  }
 
-    if (filters.inventoryId) {
-      where.inventoryId = filters.inventoryId;
-    }
+  async findMovements(
+    tenantId: string,
+    filters: {
+      variantId?: string;
+      storeId?: string;
+      type?: InventoryMovementType;
+      page?: number;
+      limit?: number;
+    },
+  ) {
+    const { variantId, storeId, type, page = 1, limit = 20 } = filters;
+    const skip = (page - 1) * limit;
 
-    if (filters.variantId) {
-      where.inventory = {
-        variantId: filters.variantId,
+    const where: Record<string, unknown> = { tenantId };
+
+    // Filtramos por variantId/storeId navegando a través de la relación inventory
+    if (variantId || storeId) {
+      where['inventory'] = {
+        ...(variantId && { variantId }),
+        ...(storeId && { storeId }),
       };
     }
+    if (type) where['type'] = type;
 
-    if (filters.storeId) {
-      where.inventory = {
-        ...where.inventory,
-        storeId: filters.storeId,
-      };
-    }
-
-    if (filters.type) {
-      where.type = filters.type;
-    }
-
-    if (filters.startDate || filters.endDate) {
-      where.createdAt = {};
-      if (filters.startDate) {
-        where.createdAt.gte = new Date(filters.startDate);
-      }
-      if (filters.endDate) {
-        where.createdAt.lte = new Date(filters.endDate);
-      }
-    }
-
-    if (filters.userId) {
-      where.userId = filters.userId;
-    }
-
-    const page = filters.page || 1;
-    const limit = filters.limit || 20;
-
-    const [total, data] = await Promise.all([
-      this.prisma.inventoryMovement.count({ where }),
+    const [items, total] = await Promise.all([
       this.prisma.inventoryMovement.findMany({
         where,
-        skip: (page - 1) * limit,
+        skip,
         take: limit,
+        orderBy: { createdAt: 'desc' },
         include: {
-          inventory: {
+          inventory: {                          // ← navegamos a través de inventory
             include: {
               variant: {
                 include: {
                   product: { select: { id: true, name: true } },
                 },
               },
-              store: { select: { id: true, name: true } },
+              store: true,
             },
           },
-          user: { select: { id: true, firstName: true, lastName: true } },
         },
-        orderBy: { createdAt: 'desc' },
       }),
+      this.prisma.inventoryMovement.count({ where }),
     ]);
 
-    return { data, total };
-  }
-
-  async getLowStockAlerts(tenantId: string, storeId?: string) {
-    const where: any = {
-      tenantId,
-      deletedAt: null,
-      quantity: {
-        lte: this.prisma.inventory.fields.minStock,
-      },
-    };
-
-    if (storeId) {
-      where.storeId = storeId;
-    }
-
-    const alerts = await this.prisma.inventory.findMany({
-      where,
-      include: {
-        variant: {
-          include: {
-            product: { select: { id: true, name: true } },
-          },
-        },
-        store: { select: { id: true, name: true } },
-      },
-    });
-
-    return alerts.map((alert: any) => ({
-      inventoryId: alert.id,
-      variantId: alert.variantId,
-      sku: alert.variant.sku,
-      productName: alert.variant.product.name,
-      storeName: alert.store.name,
-      quantity: alert.quantity,
-      minStock: alert.minStock,
-      deficit: alert.minStock - alert.quantity,
-    }));
-  }
-
-  async updateMinMaxStock(inventoryId: string, _tenantId: string, data: { minStock: number; maxStock?: number }) {
-    return this.prisma.inventory.update({
-      where: { id: inventoryId },
-      data: {
-        minStock: data.minStock,
-        maxStock: data.maxStock,
-      },
-    });
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 }

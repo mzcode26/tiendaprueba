@@ -1,53 +1,56 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { PermissionsGuard } from '../auth/guards/permissions.guard';
-import { RequirePermissions } from '../auth/decorators/require-permissions.decorator';
+import { QueryUsersDto } from './dto/query-users.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { RequirePermissions } from '../auth/decorators/require-permissions.decorator';
+import type { JwtPayload } from '../auth/types/jwt-payload.type';
 
 @Controller('users')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get()
   @RequirePermissions('view_users')
-  async findAll(
-    @CurrentUser('tenantId') tenantId: string,
-    @Query('page') page = '1',
-    @Query('limit') limit = '20',
-    @Query('search') search?: string,
-  ) {
-    return this.usersService.findAll(tenantId, Number(page), Number(limit), search);
+  findAll(@CurrentUser() user: JwtPayload, @Query() query: QueryUsersDto) {
+    return this.usersService.findAll(user.tenantId, query);
   }
 
   @Get(':id')
   @RequirePermissions('view_users')
-  async findOne(@CurrentUser('tenantId') tenantId: string, @Param('id') id: string) {
-    return this.usersService.findById(id, tenantId);
+  findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.usersService.findById(id, user.tenantId);
   }
 
   @Post()
   @RequirePermissions('create_users')
-  async create(@CurrentUser('tenantId') tenantId: string, @Body() data: CreateUserDto) {
-    return this.usersService.create(tenantId, data);
+  create(@Body() dto: CreateUserDto, @CurrentUser() user: JwtPayload) {
+    return this.usersService.create(user.tenantId, dto);
   }
 
   @Patch(':id')
   @RequirePermissions('edit_users')
-  async update(
-    @CurrentUser('tenantId') tenantId: string,
+  update(
     @Param('id') id: string,
-    @Body() data: UpdateUserDto,
+    @Body() dto: UpdateUserDto,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.usersService.update(id, tenantId, data);
+    return this.usersService.update(id, user.tenantId, dto);
   }
 
   @Delete(':id')
   @RequirePermissions('delete_users')
-  async remove(@CurrentUser('tenantId') tenantId: string, @Param('id') id: string) {
-    return this.usersService.softDelete(id, tenantId);
+  remove(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.usersService.remove(id, user.tenantId);
   }
 }

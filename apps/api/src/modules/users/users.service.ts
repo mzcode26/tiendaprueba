@@ -1,67 +1,58 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { UsersRepository } from './users.repository';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { UserType } from './types/user.type';
+import { QueryUsersDto } from './dto/query-users.dto';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly usersRepository: UsersRepository) {}
+  constructor(private usersRepository: UsersRepository) {}
 
-  private sanitizeUser(user: any): UserType {
-    return {
-      id: user.id,
-      tenantId: user.tenantId,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      isActive: user.isActive,
-      lastLoginAt: user.lastLoginAt,
-      roles: user.roles.map((userRole: any) => ({
-        id: userRole.role.id,
-        name: userRole.role.name,
-      })),
-    };
+  findAll(tenantId: string, query: QueryUsersDto) {
+    return this.usersRepository.findAll(tenantId, query);
   }
 
   async findById(id: string, tenantId: string) {
     const user = await this.usersRepository.findById(id, tenantId);
-    if (!user) {
-      throw new NotFoundException('User not found');
+    if (!user) throw new NotFoundException('User not found');
+    return user;
+  }
+
+  async create(tenantId: string, dto: CreateUserDto) {
+    const existing = await this.usersRepository.findByEmail(dto.email, tenantId);
+    if (existing) {
+      throw new ConflictException('A user with this email already exists');
     }
-    return this.sanitizeUser(user);
+
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    return this.usersRepository.create(tenantId, dto, hashedPassword);
   }
 
-  async findAll(tenantId: string, page: number, limit: number, search?: string) {
-    const result = await this.usersRepository.findAll(tenantId, { page, limit, search });
-    return {
-      items: result.items.map((user: any) => this.sanitizeUser(user)),
-      meta: result.meta,
-    };
-  }
+  async update(id: string, tenantId: string, dto: UpdateUserDto) {
+    await this.findById(id, tenantId);
 
-  async create(tenantId: string, data: CreateUserDto) {
-    const hashedPassword = await bcrypt.hash(data.password, 10);
-    const user = await this.usersRepository.create(tenantId, {
-      ...data,
-      password: hashedPassword,
-    });
-    return this.sanitizeUser({ ...user, roles: [] });
-  }
-
-  async update(id: string, tenantId: string, data: UpdateUserDto) {
-    const updatePayload: any = { ...data };
-    if (data.password) {
-      updatePayload.passwordHash = await bcrypt.hash(data.password, 10);
-      delete updatePayload.password;
+    if (dto.email) {
+      const existing = await this.usersRepository.findByEmail(dto.email, tenantId);
+      if (existing && existing.id !== id) {
+        throw new ConflictException('A user with this email already exists');
+      }
     }
-    await this.usersRepository.update(id, tenantId, updatePayload);
-    return this.findById(id, tenantId);
+
+    const hashedPassword = dto.password
+      ? await bcrypt.hash(dto.password, 10)
+      : undefined;
+
+    return this.usersRepository.update(id, dto, hashedPassword);
   }
 
-  async softDelete(id: string, tenantId: string) {
-    await this.usersRepository.softDelete(id, tenantId);
-    return { success: true, message: 'User deleted successfully' };
+  async remove(id: string, tenantId: string) {
+    await this.findById(id, tenantId);
+    await this.usersRepository.softDelete(id);
+    return { message: 'User deleted successfully' };
   }
 }

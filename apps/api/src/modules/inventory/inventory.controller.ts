@@ -1,90 +1,104 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Param,
+  Query,
+} from '@nestjs/common';
 import { InventoryService } from './inventory.service';
-import { AdjustStockDto, TransferStockDto, InventoryFiltersDto, MovementFiltersDto } from './dto/adjust-stock.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { PermissionsGuard } from '../auth/guards/permissions.guard';
-import { RequirePermissions } from '../auth/decorators/require-permissions.decorator';
+import { AdjustStockDto } from './dto/adjust-stock.dto';
+import { TransferStockDto } from './dto/transfer-stock.dto';
+import { UpdateInventorySettingsDto } from './dto/update-inventory-settings.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { RequirePermissions } from '../auth/decorators/require-permissions.decorator';
+import type { JwtPayload } from '../auth/types/jwt-payload.type';
+import { InventoryMovementType } from '@prisma/client';
 
 @Controller('inventory')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class InventoryController {
-  constructor(private readonly service: InventoryService) {}
+  constructor(private readonly inventoryService: InventoryService) {}
 
-  @Get()
+  @Get('store/:storeId')
   @RequirePermissions('view_inventory')
-  async findAll(
-    @CurrentUser('tenantId') tenantId: string,
-    @Query() filters: InventoryFiltersDto,
+  getByStore(
+    @Param('storeId') storeId: string,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.service.getInventory(tenantId, filters);
+    return this.inventoryService.getByStore(storeId, user.tenantId);
+  }
+
+  @Get('store/:storeId/variant/:variantId')
+  @RequirePermissions('view_inventory')
+  getByVariantAndStore(
+    @Param('storeId') storeId: string,
+    @Param('variantId') variantId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.inventoryService.getByVariantAndStore(
+      variantId,
+      storeId,
+      user.tenantId,
+    );
   }
 
   @Get('low-stock')
   @RequirePermissions('view_inventory')
-  async getLowStockAlerts(
-    @CurrentUser('tenantId') tenantId: string,
-    @Query('storeId') storeId?: string,
-  ) {
-    return this.service.getLowStockAlerts(tenantId, storeId);
+  getLowStock(@CurrentUser() user: JwtPayload) {
+    return this.inventoryService.getLowStock(user.tenantId);
   }
 
   @Get('movements')
   @RequirePermissions('view_inventory')
-  async getMovements(
-    @CurrentUser('tenantId') tenantId: string,
-    @Query() filters: MovementFiltersDto,
+  getMovements(
+    @CurrentUser() user: JwtPayload,
+    @Query('variantId') variantId?: string,
+    @Query('storeId') storeId?: string,
+    @Query('type') type?: InventoryMovementType,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.service.getMovements(tenantId, filters);
-  }
-
-  @Get(':variantId/stores/:storeId')
-  @RequirePermissions('view_inventory')
-  async getStockByVariantAndStore(
-    @CurrentUser('tenantId') tenantId: string,
-    @Param('variantId') variantId: string,
-    @Param('storeId') storeId: string,
-  ) {
-    return this.service.getStockByVariantAndStore(variantId, storeId, tenantId);
+    return this.inventoryService.getMovements(user.tenantId, {
+      variantId,
+      storeId,
+      type,
+      page: page ? parseInt(page) : 1,
+      limit: limit ? parseInt(limit) : 20,
+    });
   }
 
   @Post('adjust')
-  @RequirePermissions('edit_inventory')
-  async adjustStock(
-    @CurrentUser('tenantId') tenantId: string,
-    @CurrentUser('userId') userId: string,
-    @Body() data: AdjustStockDto,
+  @RequirePermissions('manage_inventory')
+  adjustStock(
+    @Body() dto: AdjustStockDto,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.service.adjustStock(tenantId, userId, data);
+    return this.inventoryService.adjustStock(user.tenantId, user.sub, dto);
   }
 
   @Post('transfer')
-  @RequirePermissions('edit_inventory')
-  async transferStock(
-    @CurrentUser('tenantId') tenantId: string,
-    @CurrentUser('userId') userId: string,
-    @Body() data: TransferStockDto,
+  @RequirePermissions('manage_inventory')
+  transferStock(
+    @Body() dto: TransferStockDto,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.service.transferStock(tenantId, userId, data);
+    return this.inventoryService.transferStock(user.tenantId, user.sub, dto);
   }
 
-  @Post('initial')
-  @RequirePermissions('create_inventory')
-  async setInitialStock(
-    @CurrentUser('tenantId') tenantId: string,
-    @CurrentUser('userId') userId: string,
-    @Body() data: { variantId: string; storeId: string; quantity: number },
+  @Patch('settings/:storeId/:variantId')
+  @RequirePermissions('manage_inventory')
+  updateSettings(
+    @Param('storeId') storeId: string,
+    @Param('variantId') variantId: string,
+    @Body() dto: UpdateInventorySettingsDto,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.service.setInitialStock(tenantId, userId, data);
-  }
-
-  @Patch(':inventoryId/limits')
-  @RequirePermissions('edit_inventory')
-  async updateStockLimits(
-    @CurrentUser('tenantId') tenantId: string,
-    @Param('inventoryId') inventoryId: string,
-    @Body() data: { minStock: number; maxStock?: number },
-  ) {
-    return this.service.updateStockLimits(tenantId, inventoryId, data);
+    return this.inventoryService.updateSettings(
+      variantId,
+      storeId,
+      user.tenantId,
+      dto,
+    );
   }
 }

@@ -10,6 +10,67 @@ export class PosService {
     private readonly salesService: SalesService,
   ) {}
 
+async getStoreInventorySummary(tenantId: string, storeId: string) {
+  const store = await this.prisma.store.findFirst({
+    where: { id: storeId, tenantId, deletedAt: null },
+    select: { id: true, name: true },
+  });
+  if (!store) throw new BadRequestException('Store not found');
+
+  const inventory = await this.prisma.inventory.findMany({
+    where: { storeId, tenantId },
+    include: {
+      variant: {
+        include: {
+          product: { select: { id: true, name: true } },
+        },
+      },
+    },
+  });
+
+  const totalItems = inventory.length;
+  const lowStock = inventory.filter(
+    (i) => i.minStock != null && i.quantity <= i.minStock,
+  ).length;
+  const outOfStock = inventory.filter((i) => i.quantity === 0).length;
+
+  return { store, totalItems, lowStock, outOfStock, inventory };
+}
+
+async getDailySummary(tenantId: string, storeId: string) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const sales = await this.prisma.sale.findMany({
+    where: {
+      tenantId,
+      storeId,
+      createdAt: { gte: today, lt: tomorrow },
+      status: { not: 'CANCELLED' },
+    },
+    include: {
+      payments: true,
+    },
+  });
+
+  const totalSales = sales.length;
+  const totalRevenue = sales.reduce((sum, s) => sum + Number(s.total), 0);
+  const totalPayments = sales.flatMap((s) => s.payments).reduce(
+    (sum, p) => sum + Number(p.amount),
+    0,
+  );
+
+  return {
+    date: today,
+    storeId,
+    totalSales,
+    totalRevenue,
+    totalPayments,
+  };
+}
+
   async searchProducts(tenantId: string, data: PosSearchDto) {
     const { q, storeId, type = 'name' } = data;
 
@@ -94,13 +155,13 @@ export class PosService {
     }));
 
     // Create sale using sales service
-    return this.salesService.createSale(tenantId, userId, {
+    return this.salesService.create(tenantId, userId, {
       storeId: data.storeId,
       customerId: data.customerId,
       items: saleItems,
       discountAmount: data.discountAmount || 0,
       notes: data.notes,
-      // POS sales are typically paid immediately, but we'll let the service handle it
+
     });
   }
 

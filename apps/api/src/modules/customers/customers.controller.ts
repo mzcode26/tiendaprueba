@@ -1,66 +1,65 @@
-import { Controller, Get, Post, Patch, Delete, Query, Param, Body } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+} from '@nestjs/common';
 import { CustomersService } from './customers.service';
-import { CreateCustomerDto, UpdateCustomerDto, CustomerFiltersDto } from './dto/index';
-import { RequirePermissions } from '../auth/decorators/require-permissions.decorator';
+import { CreateCustomerDto } from './dto/create-customer.dto';
+import { UpdateCustomerDto } from './dto/update-customer.dto';
+import { QueryCustomersDto } from './dto/query-customers.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { RequirePermissions } from '../auth/decorators/require-permissions.decorator';
 import type { JwtPayload } from '../auth/types/jwt-payload.type';
 
 @Controller('customers')
 export class CustomersController {
-  constructor(private service: CustomersService) {}
+  constructor(private readonly customersService: CustomersService) {}
 
   @Get()
   @RequirePermissions('view_customers')
   findAll(
     @CurrentUser() user: JwtPayload,
-    @Query() filters: CustomerFiltersDto,
+    @Query() query: QueryCustomersDto,
   ) {
-    return this.service.findAll(user.tenantId, filters);
-  }
-
-  @Get('top')
-  @RequirePermissions('view_reports')
-  getTopCustomers(
-    @CurrentUser() user: JwtPayload,
-    @Query('limit') limit?: number,
-  ) {
-    return this.service.getTopCustomers(user.tenantId, limit);
+    return this.customersService.findAll(user.tenantId, query);
   }
 
   @Get(':id')
   @RequirePermissions('view_customers')
-  findById(
-    @CurrentUser() user: JwtPayload,
-    @Param('id') id: string,
-  ) {
-    return this.service.findById(user.tenantId, id);
+  findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.customersService.findById(id, user.tenantId);
+  }
+
+  @Get(':id/stats')
+  @RequirePermissions('view_customers')
+  getStats(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.customersService.getStats(id, user.tenantId);
   }
 
   @Post()
   @RequirePermissions('create_customers')
-  create(
-    @CurrentUser() user: JwtPayload,
-    @Body() data: CreateCustomerDto,
-  ) {
-    return this.service.create(user.tenantId, data);
+  create(@Body() dto: CreateCustomerDto, @CurrentUser() user: JwtPayload) {
+    return this.customersService.create(user.tenantId, dto);
   }
 
   @Patch(':id')
   @RequirePermissions('edit_customers')
   update(
-    @CurrentUser() user: JwtPayload,
     @Param('id') id: string,
-    @Body() data: UpdateCustomerDto,
+    @Body() dto: UpdateCustomerDto,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.service.update(user.tenantId, id, data);
+    return this.customersService.update(id, user.tenantId, dto);
   }
 
   @Delete(':id')
   @RequirePermissions('delete_customers')
-  remove(
-    @CurrentUser() user: JwtPayload,
-    @Param('id') id: string,
-  ) {
-    return this.service.remove(user.tenantId, id);
+  remove(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.customersService.remove(id, user.tenantId);
   }
 }

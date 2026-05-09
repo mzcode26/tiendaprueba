@@ -1,19 +1,20 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsBoolean,
+  IsEmail,
+} from 'class-validator';
 
 export class CreateStoreDto {
   @IsString()
-  @IsNotEmpty()
-  @MaxLength(100)
-  name!: string;
+  name: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(500)
   address?: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(20)
   phone?: string;
 
   @IsOptional()
@@ -21,5 +22,6 @@ export class CreateStoreDto {
   email?: string;
 
   @IsOptional()
+  @IsBoolean()
   isActive?: boolean;
 }

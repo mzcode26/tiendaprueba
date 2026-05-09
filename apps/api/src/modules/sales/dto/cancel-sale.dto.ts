@@ -1,8 +1,7 @@
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { IsString, IsOptional } from 'class-validator';
 
 export class CancelSaleDto {
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  @MaxLength(500)
-  cancelReason: string;
+  reason?: string;
 }
