@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../prisma/generated/client'
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -164,20 +164,22 @@ async function main() {
     },
   });
 
-  await prisma.userRole.upsert({
-    where: {
-      userId_roleId_storeId: {
-        userId: adminUser.id,
-        roleId: adminRole.id,
-        storeId: null,
-      },
-    },
-    update: {},
-    create: {
+const existingUserRole = await prisma.userRole.findFirst({
+  where: {
+    userId: adminUser.id,
+    roleId: adminRole.id,
+    storeId: null,
+  },
+});
+
+if (!existingUserRole) {
+  await prisma.userRole.create({
+    data: {
       userId: adminUser.id,
       roleId: adminRole.id,
     },
   });
+}
 
   const existingStore = await prisma.store.findFirst({
     where: {

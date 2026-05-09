@@ -1,4 +1,4 @@
-import { api } from '../../../lib/axios';
+import api  from '../../../lib/axios';
 import type { Sale, SaleFilters } from '../types/sales.types';
 import type { ApiResponse, PaginatedResponse } from '../../../types/api.types';
 

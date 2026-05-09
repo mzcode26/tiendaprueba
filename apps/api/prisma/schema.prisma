@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -14,6 +13,7 @@ model Tenant {
   slug      String    @unique @map("slug")
   plan      String    @default("free") @map("plan")
   isActive  Boolean   @default(true) @map("is_active")
+  settings  Json?     @map("settings")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
@@ -29,7 +29,6 @@ model Tenant {
   Attribute Attribute[]
 
   @@map("tenants")
-  settings Json?
 }
 
 model User {
@@ -40,6 +39,7 @@ model User {
   refreshTokenHash String?   @map("refresh_token_hash")
   firstName        String    @map("first_name")
   lastName         String    @map("last_name")
+  phone            String?   @map("phone")
   isActive         Boolean   @default(true) @map("is_active")
   lastLoginAt      DateTime? @map("last_login_at")
   createdAt        DateTime  @default(now()) @map("created_at")
@@ -352,6 +352,8 @@ enum InventoryMovementType {
   SALE
   RETURN
   ADJUSTMENT
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
   TRANSFER_IN
   TRANSFER_OUT
   INITIAL
@@ -366,7 +368,13 @@ model Customer {
   phone          String?   @map("phone")
   documentType   String?   @map("document_type")
   documentNumber String?   @map("document_number")
+  birthDate      DateTime? @map("birthDate")
+  gender         String?   @map("gender")
+  province       String?   @map("province")
+  postalCode     String?   @map("postalCode")
+  city      String?   @map("city")
   address        String?   @map("address")
+  taxId     String?   @map("tax_id")
   notes          String?   @map("notes")
   isActive       Boolean   @default(true) @map("is_active")
   createdAt      DateTime  @default(now()) @map("created_at")
@@ -389,6 +397,7 @@ model Sale {
   storeId        String     @map("store_id")
   userId         String     @map("user_id")
   customerId     String?    @map("customer_id")
+  saleNumber     String     @map("sale_number")
   status         SaleStatus @map("status")
   subtotal       Decimal    @map("subtotal") @db.Decimal(10, 2)
   discountAmount Decimal    @default(0) @map("discount_amount") @db.Decimal(10, 2)
