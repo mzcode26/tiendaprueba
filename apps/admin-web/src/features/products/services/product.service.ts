@@ -1,82 +1,44 @@
 import api from '../../../lib/axios';
-import type { ApiResponse, PaginatedResponse } from '../../../types/api.types';
-import type { Product, Category, Brand, ProductFilters, PaginatedProducts } from '../types/product.types';
-import type { ProductFormData, CategoryFormData, BrandFormData } from '../schemas/product.schema';
+import type { Product, ProductFilters, PaginatedProducts, Category, Brand } from '../types/product.types';
+import type { ApiResponse } from '../../../types/api.types';
 
 export const productService = {
-  // ── Products ──────────────────────────────────────────────
-  getProducts: async (filters: ProductFilters = {}): Promise<ApiResponse<PaginatedProducts>> => {
-    const params = new URLSearchParams();
-    if (filters.search)     params.set('search',     filters.search);
-    if (filters.categoryId) params.set('categoryId', filters.categoryId);
-    if (filters.brandId)    params.set('brandId',    filters.brandId);
-    if (filters.isActive !== undefined) params.set('isActive', String(filters.isActive));
-    if (filters.page)       params.set('page',       String(filters.page));
-    if (filters.limit)      params.set('limit',      String(filters.limit));
+  getProducts: (filters?: ProductFilters) =>
+    api.get<ApiResponse<PaginatedProducts>>('/products', { params: filters }).then(r => r.data),
 
-    const { data } = await api.get<ApiResponse<PaginatedProducts>>(`/products?${params}`);
-    return data;
-  },
+  getProduct: (id: string) =>
+    api.get<ApiResponse<Product>>(`/products/${id}`).then(r => r.data),
 
-  getProductById: async (id: string): Promise<ApiResponse<Product>> => {
-    const { data } = await api.get<ApiResponse<Product>>(`/products/${id}`);
-    return data;
-  },
+  createProduct: (data: Partial<Product>) =>
+    api.post<ApiResponse<Product>>('/products', data).then(r => r.data),
 
-  createProduct: async (payload: ProductFormData): Promise<ApiResponse<Product>> => {
-    const { data } = await api.post<ApiResponse<Product>>('/products', payload);
-    return data;
-  },
+  updateProduct: (id: string, data: Partial<Product>) =>
+    api.patch<ApiResponse<Product>>(`/products/${id}`, data).then(r => r.data),
 
-  updateProduct: async (id: string, payload: Partial<ProductFormData>): Promise<ApiResponse<Product>> => {
-    const { data } = await api.patch<ApiResponse<Product>>(`/products/${id}`, payload);
-    return data;
-  },
+  deleteProduct: (id: string) =>
+    api.delete(`/products/${id}`).then(r => r.data),
 
-  deleteProduct: async (id: string): Promise<ApiResponse<void>> => {
-    const { data } = await api.delete<ApiResponse<void>>(`/products/${id}`);
-    return data;
-  },
+  // Variants
+  createVariant: (productId: string, data: Partial<ProductVariant>) =>
+    api.post<ApiResponse<ProductVariant>>(`/products/${productId}/variants`, data).then(r => r.data),
 
-  // ── Categories ────────────────────────────────────────────
-  getCategories: async (): Promise<ApiResponse<PaginatedResponse<Category>>> => {
-    const { data } = await api.get<ApiResponse<PaginatedResponse<Category>>>('/categories?limit=100');
-    return data;
-  },
+  updateVariant: (productId: string, variantId: string, data: Partial<ProductVariant>) =>
+    api.patch<ApiResponse<ProductVariant>>(`/products/${productId}/variants/${variantId}`, data).then(r => r.data),
 
-  createCategory: async (payload: CategoryFormData): Promise<ApiResponse<Category>> => {
-    const { data } = await api.post<ApiResponse<Category>>('/categories', payload);
-    return data;
-  },
+  deleteVariant: (productId: string, variantId: string) =>
+    api.delete(`/products/${productId}/variants/${variantId}`).then(r => r.data),
 
-  updateCategory: async (id: string, payload: Partial<CategoryFormData>): Promise<ApiResponse<Category>> => {
-    const { data } = await api.patch<ApiResponse<Category>>(`/categories/${id}`, payload);
-    return data;
-  },
+  // Categories
+  getCategories: () =>
+    api.get<ApiResponse<Category[]>>('/categories').then(r => r.data),
 
-  deleteCategory: async (id: string): Promise<ApiResponse<void>> => {
-    const { data } = await api.delete<ApiResponse<void>>(`/categories/${id}`);
-    return data;
-  },
+  createCategory: (data: Partial<Category>) =>
+    api.post<ApiResponse<Category>>('/categories', data).then(r => r.data),
 
-  // ── Brands ────────────────────────────────────────────────
-  getBrands: async (): Promise<ApiResponse<PaginatedResponse<Brand>>> => {
-    const { data } = await api.get<ApiResponse<PaginatedResponse<Brand>>>('/brands?limit=100');
-    return data;
-  },
+  // Brands
+  getBrands: () =>
+    api.get<ApiResponse<Brand[]>>('/brands').then(r => r.data),
 
-  createBrand: async (payload: BrandFormData): Promise<ApiResponse<Brand>> => {
-    const { data } = await api.post<ApiResponse<Brand>>('/brands', payload);
-    return data;
-  },
-
-  updateBrand: async (id: string, payload: Partial<BrandFormData>): Promise<ApiResponse<Brand>> => {
-    const { data } = await api.patch<ApiResponse<Brand>>(`/brands/${id}`, payload);
-    return data;
-  },
-
-  deleteBrand: async (id: string): Promise<ApiResponse<void>> => {
-    const { data } = await api.delete<ApiResponse<void>>(`/brands/${id}`);
-    return data;
-  },
+  createBrand: (data: Partial<Brand>) =>
+    api.post<ApiResponse<Brand>>('/brands', data).then(r => r.data),
 };

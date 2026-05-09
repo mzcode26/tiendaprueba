@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import type { AuthUser } from '../features/auth/types/auth.types';
 
 interface AuthState {
@@ -10,39 +11,28 @@ interface AuthState {
   clearAuth: () => void;
 }
 
-const STORAGE_KEY = 'tienda-auth';
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      token: null,
+      refreshToken: null,
+      user: null,
+      isAuthenticated: false,
 
-const loadFromStorage = (): Partial<AuthState> => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-};
+      setAuth: (token, refreshToken, user) =>
+        set({ token, refreshToken, user, isAuthenticated: true }),
 
-const saveToStorage = (state: Partial<AuthState>) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {}
-};
-
-const stored = loadFromStorage();
-
-export const useAuthStore = create<AuthState>((set) => ({
-  token: stored.token ?? null,
-  refreshToken: stored.refreshToken ?? null,
-  user: stored.user ?? null,
-  isAuthenticated: stored.isAuthenticated ?? false,
-
-  setAuth: (token, refreshToken, user) => {
-    const next = { token, refreshToken, user, isAuthenticated: true };
-    saveToStorage(next);
-    set(next);
-  },
-
-  clearAuth: () => {
-    localStorage.removeItem(STORAGE_KEY);
-    set({ token: null, refreshToken: null, user: null, isAuthenticated: false });
-  },
-}));
+      clearAuth: () =>
+        set({ token: null, refreshToken: null, user: null, isAuthenticated: false }),
+    }),
+    {
+      name: 'tienda-auth',
+      partialize: (state) => ({
+        token: state.token,
+        refreshToken: state.refreshToken,
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
+      }),
+    }
+  )
+);

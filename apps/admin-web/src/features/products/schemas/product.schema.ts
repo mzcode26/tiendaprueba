@@ -1,14 +1,5 @@
 import { z } from 'zod';
 
-export const variantSchema = z.object({
-  sku: z.string().min(1, 'El SKU es requerido'),
-  size: z.string().optional(),
-  color: z.string().optional(),
-  price: z.coerce.number().min(0, 'El precio debe ser mayor a 0'),
-  compareAtPrice: z.coerce.number().optional(),
-  isActive: z.boolean().default(true),
-});
-
 export const productSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
   description: z.string().optional(),
@@ -18,7 +9,15 @@ export const productSchema = z.object({
   categoryId: z.string().optional(),
   brandId: z.string().optional(),
   isActive: z.boolean().default(true),
-  variants: z.array(variantSchema).default([]),
+});
+
+export const variantSchema = z.object({
+  sku: z.string().min(1, 'El SKU es requerido'),
+  size: z.string().optional(),
+  color: z.string().optional(),
+  price: z.coerce.number().min(0, 'El precio debe ser mayor a 0'),
+  compareAtPrice: z.coerce.number().optional(),
+  isActive: z.boolean().default(true),
 });
 
 export const categorySchema = z.object({

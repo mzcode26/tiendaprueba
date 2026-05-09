@@ -5,6 +5,7 @@ import AuthLayout from '../layouts/AuthLayout';
 import DashboardLayout from '../layouts/DashboardLayout';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import NotFound from '../pages/NotFound';
+import POSPage from '../features/sales/pages/POSPage';
 
 const LoginPage = lazy(() => import('../features/auth/pages/LoginPage'));
 const DashboardPage = lazy(() => import('../pages/DashboardPage'));
@@ -120,6 +121,24 @@ const router = createBrowserRouter([
       },
     ],
   },
+  {
+  path: '/pos',
+  element: (
+    <ProtectedRoute>
+      <DashboardLayout />
+    </ProtectedRoute>
+  ),
+  children: [
+    {
+      index: true,
+      element: (
+        <Suspense fallback={<LoadingSpinner />}>
+          <POSPage />
+        </Suspense>
+      ),
+    },
+  ],
+},
 ]);
 
 const AppRouter = () => <RouterProvider router={router} />;

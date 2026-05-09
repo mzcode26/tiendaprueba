@@ -1,5 +1,5 @@
 import api from '../../../lib/axios';
-import type { Customer, CustomerFilters, CustomerSale } from '../types/customer.types';
+import type { Customer, CustomerFilters } from '../types/customer.types';
 import type { ApiResponse, PaginatedResponse } from '../../../types/api.types';
 
 export const customersService = {
