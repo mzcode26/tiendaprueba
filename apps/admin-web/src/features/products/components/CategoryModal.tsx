@@ -1,37 +1,139 @@
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { categorySchema, type CategoryFormData } from '../schemas/product.schema';
-import { useCreateCategory } from '../hooks/useProducts';
+import { useEffect, useState } from 'react';
 
-interface Props {
-  onClose: () => void;
+export interface CategoryLike {
+  id: string;
+  name: string;
+  description?: string | null;
+  slug?: string;
 }
 
-export function CategoryModal({ onClose }: Props) {
-  const { register, handleSubmit, formState: { errors } } = useForm<CategoryFormData>({
-    resolver: zodResolver(categorySchema),
-  });
-  const createCategory = useCreateCategory();
+interface CategoryModalProps {
+  open: boolean;
+  initialData?: CategoryLike | null;
+  onClose: () => void;
+  onSuccess: (category: CategoryLike) => void;
+}
 
-  const onSubmit = async (data: CategoryFormData) => {
-    await createCategory.mutateAsync(data);
-    onClose();
+function generateSlug(value: string) {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
+export function CategoryModal({
+  open,
+  initialData,
+  onClose,
+  onSuccess,
+}: CategoryModalProps) {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (initialData) {
+      setName(initialData.name ?? '');
+      setDescription(initialData.description ?? '');
+    } else {
+      setName('');
+      setDescription('');
+    }
+    setError('');
+  }, [initialData, open]);
+
+  if (!open) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      setError('El nombre es obligatorio');
+      return;
+    }
+
+    const payload = {
+      name: trimmedName,
+      description: description.trim() || undefined,
+      slug: generateSlug(trimmedName),
+    };
+
+    try {
+      setLoading(true);
+
+      // Acá luego conectás tu service real de categorías.
+      // Por ahora el modal queda listo para integrarse sin cambiar el patrón.
+      onSuccess({
+        id: initialData?.id ?? '',
+        name: payload.name,
+        description: payload.description,
+        slug: payload.slug,
+      });
+
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al guardar la categoría');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-        <h2 className="text-lg font-semibold mb-4">Nueva Categoría</h2>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
-            <input {...register('name')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold">
+            {initialData?.id ? 'Editar categoría' : 'Nueva categoría'}
+          </h2>
+          <button onClick={onClose} className="text-sm text-gray-500">
+            Cerrar
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="grid gap-4">
+          <div className="grid gap-2">
+            <label className="text-sm font-medium">Nombre</label>
+            <input
+              className="rounded-lg border px-3 py-2"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ej: Remeras"
+              required
+            />
           </div>
-          <div className="flex justify-end gap-3">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">Cancelar</button>
-            <button type="submit" disabled={createCategory.isPending} className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">
-              {createCategory.isPending ? 'Guardando...' : 'Guardar'}
+
+          <div className="grid gap-2">
+            <label className="text-sm font-medium">Descripción</label>
+            <textarea
+              className="rounded-lg border px-3 py-2"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Descripción opcional"
+              rows={4}
+            />
+          </div>
+
+          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg border px-4 py-2"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="rounded-lg bg-black px-4 py-2 text-white disabled:opacity-60"
+            >
+              {loading ? 'Guardando...' : 'Guardar categoría'}
             </button>
           </div>
         </form>

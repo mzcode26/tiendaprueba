@@ -176,154 +176,157 @@ export class ReportsService {
 
   // ─── Revenue by Payment Method ─────────────────────────────────────────────
 
-  async getRevenueByPaymentMethod(tenantId: string, dto: QueryReportDto) {
-    const { storeId, dateFrom, dateTo } = dto;
+async getRevenueByPaymentMethod(tenantId: string, dto: QueryReportDto) {
+  const { storeId, dateFrom, dateTo } = dto;
 
-    const storeFilter = storeId ? `AND s.store_id = '${storeId}'` : '';
-    const dateFromFilter = dateFrom
-      ? `AND s.created_at >= '${new Date(dateFrom).toISOString()}'`
-      : '';
-    const dateToFilter = dateTo
-      ? `AND s.created_at <= '${new Date(dateTo).toISOString()}'`
-      : '';
+  const storeFilter = storeId ? `AND s.store_id = '${storeId}'` : '';
+  const dateFromFilter = dateFrom
+    ? `AND s.created_at >= '${new Date(dateFrom).toISOString()}'`
+    : '';
+  const dateToFilter = dateTo
+    ? `AND s.created_at <= '${new Date(dateTo).toISOString()}'`
+    : '';
 
-    return this.prisma.$queryRawUnsafe<
-      Array<{
-        method: string;
-        total_transactions: bigint;
-        total_amount: number;
-      }>
-    >(`
-      SELECT
-        sp.method,
-        COUNT(sp.id)::bigint AS total_transactions,
-        COALESCE(SUM(sp.amount), 0)::float AS total_amount
-      FROM sale_payments sp
-      JOIN sales s ON s.id = sp.sale_id
-      WHERE s.tenant_id = '${tenantId}'
-        AND s.status = 'COMPLETED'
-        AND s.deleted_at IS NULL
-        ${storeFilter}
-        ${dateFromFilter}
-        ${dateToFilter}
-      GROUP BY sp.method
-      ORDER BY total_amount DESC
-    `);
-  }
+  return this.prisma.$queryRawUnsafe<
+    Array<{
+      method: string;
+      total_transactions: bigint;
+      total_amount: number;
+    }>
+  >(`
+    SELECT
+      pmt.method,
+      COUNT(pmt.id)::bigint AS total_transactions,
+      COALESCE(SUM(pmt.amount), 0)::float AS total_amount
+    FROM payments pmt
+    JOIN sales s ON s.id = pmt.sale_id
+    WHERE s.tenant_id = '${tenantId}'
+      AND s.status = 'COMPLETED'
+      AND s.deleted_at IS NULL
+      ${storeFilter}
+      ${dateFromFilter}
+      ${dateToFilter}
+    GROUP BY pmt.method
+    ORDER BY total_amount DESC
+  `);
+}
 
   // ─── Inventory Valuation ───────────────────────────────────────────────────
 
-  async getInventoryValuation(tenantId: string, storeId?: string) {
-    const storeFilter = storeId ? `AND i.store_id = '${storeId}'` : '';
+ async getInventoryValuation(tenantId: string, storeId?: string) {
+  const storeFilter = storeId ? `AND i.store_id = '${storeId}'` : '';
 
-    return this.prisma.$queryRawUnsafe<
-      Array<{
-        store_name: string;
-        product_name: string;
-        variant_sku: string;
-        quantity: number;
-        cost_price: number;
-        total_value: number;
-      }>
-    >(`
-      SELECT
-        st.name AS store_name,
-        p.name AS product_name,
-        v.sku AS variant_sku,
-        i.quantity,
-        COALESCE(v.cost_price, 0)::float AS cost_price,
-        (i.quantity * COALESCE(v.cost_price, 0))::float AS total_value
-      FROM inventories i
-      JOIN product_variants v ON v.id = i.variant_id
-      JOIN products p ON p.id = v.product_id
-      JOIN stores st ON st.id = i.store_id
-      WHERE i.tenant_id = '${tenantId}'
-        AND p.deleted_at IS NULL
-        AND v.deleted_at IS NULL
-        ${storeFilter}
-      ORDER BY total_value DESC
-    `);
-  }
+  return this.prisma.$queryRawUnsafe<
+    Array<{
+      store_name: string;
+      product_name: string;
+      variant_sku: string;
+      quantity: number;
+      cost_price: number;
+      total_value: number;
+    }>
+  >(`
+    SELECT
+      st.name AS store_name,
+      p.name AS product_name,
+      v.sku AS variant_sku,
+      i.quantity,
+      COALESCE(v.cost_price, 0)::float AS cost_price,
+      (i.quantity * COALESCE(v.cost_price, 0))::float AS total_value
+    FROM inventory i
+    JOIN product_variants v ON v.id = i.variant_id
+    JOIN products p ON p.id = v.product_id
+    JOIN stores st ON st.id = i.store_id
+    WHERE i.tenant_id = '${tenantId}'
+      AND i.deleted_at IS NULL
+      AND p.deleted_at IS NULL
+      AND v.deleted_at IS NULL
+      ${storeFilter}
+    ORDER BY total_value DESC
+  `);
+}
 
   // ─── Dashboard Summary ─────────────────────────────────────────────────────
 
-  async getDashboardSummary(tenantId: string, storeId?: string) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const startOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-    const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+async getDashboardSummary(tenantId: string, storeId?: string) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-    const storeWhere = storeId ? { storeId } : {};
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const startOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
 
-    const baseWhere = {
-      tenantId,
-      status: 'COMPLETED' as const,
-      deletedAt: null,
-      ...storeWhere,
-    };
+  const storeWhere = storeId ? { storeId } : {};
 
-    const [
-      todaySales,
-      monthSales,
-      lastMonthSales,
-      totalCustomers,
-      lowStockCount,
-    ] = await Promise.all([
-      this.prisma.sale.aggregate({
-        where: { ...baseWhere, createdAt: { gte: today } },
-        _sum: { total: true },
-        _count: { id: true },
-      }),
-      this.prisma.sale.aggregate({
-        where: { ...baseWhere, createdAt: { gte: startOfMonth } },
-        _sum: { total: true },
-        _count: { id: true },
-      }),
-      this.prisma.sale.aggregate({
-        where: {
-          ...baseWhere,
-          createdAt: { gte: startOfLastMonth, lte: endOfLastMonth },
-        },
-        _sum: { total: true },
-        _count: { id: true },
-      }),
-      this.prisma.customer.count({
-        where: { tenantId, deletedAt: null, isActive: true },
-      }),
-      this.prisma.$queryRawUnsafe<[{ count: bigint }]>(`
-        SELECT COUNT(*)::bigint as count
-        FROM inventories i
-        WHERE i.tenant_id = '${tenantId}'
-          ${storeId ? `AND i.store_id = '${storeId}'` : ''}
-          AND i.min_stock IS NOT NULL
-          AND i.quantity <= i.min_stock
-      `),
-    ]);
+  const baseWhere = {
+    tenantId,
+    status: 'COMPLETED' as const,
+    deletedAt: null,
+    ...storeWhere,
+  };
 
-    const monthRevenue = Number(monthSales._sum.total ?? 0);
-    const lastMonthRevenue = Number(lastMonthSales._sum.total ?? 0);
-    const revenueGrowth =
-      lastMonthRevenue > 0
-        ? ((monthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100
-        : 0;
-
-    return {
-      today: {
-        sales: todaySales._count.id,
-        revenue: Number(todaySales._sum.total ?? 0),
+  const [
+    todaySales,
+    monthSales,
+    lastMonthSales,
+    totalCustomers,
+    lowStockCount,
+  ] = await Promise.all([
+    this.prisma.sale.aggregate({
+      where: { ...baseWhere, createdAt: { gte: today } },
+      _sum: { total: true },
+      _count: { id: true },
+    }),
+    this.prisma.sale.aggregate({
+      where: { ...baseWhere, createdAt: { gte: startOfMonth } },
+      _sum: { total: true },
+      _count: { id: true },
+    }),
+    this.prisma.sale.aggregate({
+      where: {
+        ...baseWhere,
+        createdAt: { gte: startOfLastMonth, lte: endOfLastMonth },
       },
-      currentMonth: {
-        sales: monthSales._count.id,
-        revenue: monthRevenue,
-        revenueGrowth: Math.round(revenueGrowth * 100) / 100,
-      },
-      lastMonth: {
-        sales: lastMonthSales._count.id,
-        revenue: lastMonthRevenue,
-      },
-      totalCustomers,
-      lowStockAlerts: Number(lowStockCount[0]?.count ?? 0),
-    };
-  }
+      _sum: { total: true },
+      _count: { id: true },
+    }),
+    this.prisma.customer.count({
+      where: { tenantId, deletedAt: null, isActive: true },
+    }),
+    this.prisma.$queryRawUnsafe<[{ count: bigint }]>(`
+      SELECT COUNT(*)::bigint AS count
+      FROM inventory i
+      WHERE i.tenant_id = '${tenantId}'
+        ${storeId ? `AND i.store_id = '${storeId}'` : ''}
+        AND i.min_stock IS NOT NULL
+        AND i.quantity <= i.min_stock
+    `),
+  ]);
+
+  const monthRevenue = Number(monthSales._sum.total ?? 0);
+  const lastMonthRevenue = Number(lastMonthSales._sum.total ?? 0);
+
+  const revenueGrowth =
+    lastMonthRevenue > 0
+      ? ((monthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100
+      : 0;
+
+  return {
+    today: {
+      sales: todaySales._count.id,
+      revenue: Number(todaySales._sum.total ?? 0),
+    },
+    currentMonth: {
+      sales: monthSales._count.id,
+      revenue: monthRevenue,
+      revenueGrowth: Math.round(revenueGrowth * 100) / 100,
+    },
+    lastMonth: {
+      sales: lastMonthSales._count.id,
+      revenue: lastMonthRevenue,
+    },
+    totalCustomers,
+    lowStockAlerts: Number(lowStockCount[0]?.count ?? 0),
+  };
+}
 }

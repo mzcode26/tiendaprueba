@@ -1,100 +1,204 @@
-import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { productSchema, type ProductFormData } from '../schemas/product.schema';
-import { useCategories, useBrands } from '../hooks/useProducts';
-import type { Product } from '../types/product.types';
+import { useEffect, useState } from 'react';
+import { useCreateProduct, useUpdateProduct } from '../hooks/useProducts';
+import type {
+  Product,
+  CreateProductInput,
+  UpdateProductInput,
+} from '../types/product.types';
 
-interface Props {
-  product?: Product;
-  onSubmit: (data: ProductFormData) => void;
-  isLoading?: boolean;
+interface ProductFormProps {
+  open: boolean;
+  initialData?: Product | null;
+  onClose: () => void;
+  onSuccess: (product: Product) => void;
 }
 
-export function ProductForm({ product, onSubmit, isLoading }: Props) {
-  const { data: categoriesData } = useCategories();
-  const { data: brandsData } = useBrands();
+export function ProductForm({
+  open,
+  initialData,
+  onClose,
+  onSuccess,
+}: ProductFormProps) {
+  const createProduct = useCreateProduct();
+  const updateProduct = useUpdateProduct();
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<ProductFormData>({
-    resolver: zodResolver(productSchema),
-    defaultValues: { isActive: true },
-  });
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [brandId, setBrandId] = useState('');
+  const [tagsText, setTagsText] = useState('');
+  const [isActive, setIsActive] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    if (product) reset(product);
-  }, [product, reset]);
+    if (initialData) {
+      setName(initialData.name ?? '');
+      setDescription(initialData.description ?? '');
+      setCategoryId(initialData.categoryId ?? '');
+      setBrandId(initialData.brandId ?? '');
+      setTagsText((initialData.tags ?? []).join(', '));
+      setIsActive(initialData.isActive ?? true);
+    } else {
+      setName('');
+      setDescription('');
+      setCategoryId('');
+      setBrandId('');
+      setTagsText('');
+      setIsActive(true);
+    }
+
+    setError('');
+  }, [initialData, open]);
+
+  if (!open) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    const tags = tagsText
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+
+    try {
+      if (initialData?.id) {
+        const dto: UpdateProductInput = {
+          name: name.trim(),
+          description: description.trim() || undefined,
+          categoryId: categoryId.trim() || undefined,
+          brandId: brandId.trim() || undefined,
+          tags,
+          isActive,
+        };
+
+        const updated = await updateProduct.mutateAsync({
+          id: initialData.id,
+          dto,
+        });
+
+        onSuccess(updated);
+      } else {
+        const dto: CreateProductInput = {
+          name: name.trim(),
+          description: description.trim() || undefined,
+          categoryId: categoryId.trim() || undefined,
+          brandId: brandId.trim() || undefined,
+          tags,
+          isActive,
+        };
+
+        const created = await createProduct.mutateAsync(dto);
+        onSuccess(created);
+      }
+
+      onClose();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Error al guardar el producto',
+      );
+    }
+  };
+
+  const loading = createProduct.isPending || updateProduct.isPending;
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
-          <input {...register('name')}
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold">
+            {initialData?.id ? 'Editar producto' : 'Nuevo producto'}
+          </h2>
+
+          <button onClick={onClose} className="text-sm text-gray-500">
+            Cerrar
+          </button>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">SKU *</label>
-          <input {...register('sku')}
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          {errors.sku && <p className="text-red-500 text-xs mt-1">{errors.sku.message}</p>}
-        </div>
+        <form onSubmit={handleSubmit} className="grid gap-4">
+          <div className="grid gap-2">
+            <label className="text-sm font-medium">Nombre</label>
+            <input
+              className="rounded-lg border px-3 py-2"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ej: Remera básica"
+              required
+            />
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Precio *</label>
-          <input {...register('price')} type="number" step="0.01"
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          {errors.price && <p className="text-red-500 text-xs mt-1">{errors.price.message}</p>}
-        </div>
+          <div className="grid gap-2">
+            <label className="text-sm font-medium">Descripción</label>
+            <textarea
+              className="rounded-lg border px-3 py-2"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Descripción del producto"
+              rows={4}
+            />
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Precio comparativo</label>
-          <input {...register('compareAtPrice')} type="number" step="0.01"
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Category ID</label>
+              <input
+                className="rounded-lg border px-3 py-2"
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                placeholder="ID de categoría"
+              />
+            </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
-          <select {...register('categoryId')}
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="">Sin categoría</option>
-            {categoriesData?.data?.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Brand ID</label>
+              <input
+                className="rounded-lg border px-3 py-2"
+                value={brandId}
+                onChange={(e) => setBrandId(e.target.value)}
+                placeholder="ID de marca"
+              />
+            </div>
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Marca</label>
-          <select {...register('brandId')}
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="">Sin marca</option>
-            {brandsData?.data?.map(b => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </select>
-        </div>
+          <div className="grid gap-2">
+            <label className="text-sm font-medium">Tags</label>
+            <input
+              className="rounded-lg border px-3 py-2"
+              value={tagsText}
+              onChange={(e) => setTagsText(e.target.value)}
+              placeholder="remera, algodón, verano"
+            />
+          </div>
 
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
-          <textarea {...register('description')} rows={3}
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={isActive}
+              onChange={(e) => setIsActive(e.target.checked)}
+            />
+            Activo
+          </label>
 
-        <div className="flex items-center gap-2">
-          <input {...register('isActive')} type="checkbox" id="productActive"
-            className="rounded border-gray-300" />
-          <label htmlFor="productActive" className="text-sm text-gray-700">Producto activo</label>
-        </div>
+          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg border px-4 py-2"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="rounded-lg bg-black px-4 py-2 text-white disabled:opacity-60"
+            >
+              {loading ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
+        </form>
       </div>
-
-      <div className="flex justify-end pt-2">
-        <button type="submit" disabled={isLoading}
-          className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
-          {isLoading ? 'Guardando...' : 'Guardar producto'}
-        </button>
-      </div>
-    </form>
+    </div>
   );
 }

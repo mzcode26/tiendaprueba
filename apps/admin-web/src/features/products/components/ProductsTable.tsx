@@ -1,73 +1,120 @@
-import { Pencil, Trash2 } from 'lucide-react';
-import type { Product } from '../types/product.types';
-import { formatCurrency } from '../../../lib/utils';
+import type { Product, ProductVariant } from '../types/product.types';
 
-interface Props {
+interface ProductsTableProps {
   products: Product[];
-  onEdit: (product: Product) => void;
-  onDelete: (product: Product) => void;
+  onEditProduct: (product: Product) => void;
+  onDeleteProduct: (id: string) => void;
+  onAddVariant: (product: Product) => void;
+  onEditVariant: (product: Product, variant: ProductVariant) => void;
+  onViewDetail: (product: Product) => void;
 }
 
-export function ProductsTable({ products, onEdit, onDelete }: Props) {
-  if (!products.length) return (
-    <div className="text-center py-12 text-gray-400">
-      <p>No hay productos registrados</p>
-    </div>
-  );
+export function ProductsTable({
+  products,
+  onEditProduct,
+  onDeleteProduct,
+  onAddVariant,
+  onEditVariant,
+  onViewDetail,
+}: ProductsTableProps) {
+  if (!products.length) {
+    return (
+      <div className="p-6 text-sm text-gray-500">
+        No hay productos cargados.
+      </div>
+    );
+  }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="text-xs text-gray-500 uppercase border-b bg-gray-50">
-          <tr>
-            <th className="px-4 py-3 text-left">Producto</th>
-            <th className="px-4 py-3 text-left">SKU</th>
-            <th className="px-4 py-3 text-left">Categoría</th>
-            <th className="px-4 py-3 text-left">Marca</th>
-            <th className="px-4 py-3 text-right">Precio</th>
-            <th className="px-4 py-3 text-center">Variantes</th>
-            <th className="px-4 py-3 text-center">Estado</th>
-            <th className="px-4 py-3 text-center">Acciones</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {products.map(product => (
-            <tr key={product.id} className="hover:bg-gray-50">
-              <td className="px-4 py-3 font-medium text-gray-800">{product.name}</td>
-              <td className="px-4 py-3 font-mono text-xs text-gray-500">{product.sku}</td>
-              <td className="px-4 py-3 text-gray-500">{product.category?.name ?? '—'}</td>
-              <td className="px-4 py-3 text-gray-500">{product.brand?.name ?? '—'}</td>
-              <td className="px-4 py-3 text-right font-medium">{formatCurrency(product.price)}</td>
-              <td className="px-4 py-3 text-center">
-                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                  {product.variants?.length ?? 0}
-                </span>
-              </td>
-              <td className="px-4 py-3 text-center">
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  product.isActive
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-gray-100 text-gray-500'
-                }`}>
-                  {product.isActive ? 'Activo' : 'Inactivo'}
-                </span>
-              </td>
-              <td className="px-4 py-3">
-                <div className="flex items-center justify-center gap-2">
-                  <button onClick={() => onEdit(product)}
-                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => onDelete(product)}
-                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+    <table className="w-full text-left">
+      <thead className="border-b bg-gray-50 text-sm">
+        <tr>
+          <th className="px-4 py-3">Nombre</th>
+          <th className="px-4 py-3">Categoría</th>
+          <th className="px-4 py-3">Marca</th>
+          <th className="px-4 py-3">Estado</th>
+          <th className="px-4 py-3">Variantes</th>
+          <th className="px-4 py-3">Acciones</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {products.map((product) => (
+          <tr key={product.id} className="border-b text-sm">
+            <td className="px-4 py-3">
+              <div className="font-medium">{product.name}</div>
+              <div className="text-xs text-gray-500">{product.slug}</div>
+            </td>
+
+            <td className="px-4 py-3">
+              {product.category?.name ?? '-'}
+            </td>
+
+            <td className="px-4 py-3">
+              {product.brand?.name ?? '-'}
+            </td>
+
+            <td className="px-4 py-3">
+              {product.isActive ? 'Activo' : 'Inactivo'}
+            </td>
+
+            <td className="px-4 py-3">
+              {product.variants?.length ?? 0}
+            </td>
+
+            <td className="px-4 py-3">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => onViewDetail(product)}
+                  className="rounded-lg border px-3 py-1 text-xs"
+                >
+                  Ver
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onEditProduct(product)}
+                  className="rounded-lg border px-3 py-1 text-xs"
+                >
+                  Editar
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onAddVariant(product)}
+                  className="rounded-lg border px-3 py-1 text-xs"
+                >
+                  Agregar variante
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onDeleteProduct(product.id)}
+                  className="rounded-lg border px-3 py-1 text-xs text-red-600"
+                >
+                  Eliminar
+                </button>
+              </div>
+
+              {product.variants?.length ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {product.variants.map((variant) => (
+                    <button
+                      key={variant.id}
+                      type="button"
+                      onClick={() => onEditVariant(product, variant)}
+                      className="rounded-full bg-gray-100 px-3 py-1 text-xs"
+                    >
+                      {variant.sku}
+                    </button>
+                  ))}
                 </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+              ) : null}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }

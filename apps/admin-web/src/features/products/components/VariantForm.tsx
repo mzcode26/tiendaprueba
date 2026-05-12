@@ -1,103 +1,346 @@
-import { useForm, useFieldArray } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { variantSchema, type VariantFormData } from '../schemas/product.schema';
-import type { ProductVariant } from '../types/product.types';
+import { useEffect, useState } from 'react';
+import { useAddVariant, useUpdateVariant } from '../hooks/useProducts';
+import type {
+  Product,
+  ProductVariant,
+  CreateProductVariantInput,
+  UpdateProductVariantInput,
+} from '../types/product.types';
 
-interface Props {
-  variant?: ProductVariant;
-  onSubmit: (data: VariantFormData) => void;
-  onCancel: () => void;
-  isLoading?: boolean;
+interface VariantFormProps {
+  open: boolean;
+  product: Product;
+  initialData?: ProductVariant | null;
+  onClose: () => void;
+  onSuccess: (product: Product) => void;
 }
 
-export function VariantForm({ variant, onSubmit, onCancel, isLoading }: Props) {
-  const { register, handleSubmit, formState: { errors } } = useForm<VariantFormData>({
-    resolver: zodResolver(variantSchema),
-    defaultValues: variant
-      ? {
-          sku: variant.sku,
-          size: variant.size,
-          color: variant.color,
-          price: variant.price,
-          compareAtPrice: variant.compareAtPrice,
-          isActive: variant.isActive,
-        }
-      : { isActive: true },
-  });
+type VariantAttributeRow = {
+  attributeId: string;
+  attributeValueId: string;
+};
+
+export function VariantForm({
+  open,
+  product,
+  initialData,
+  onClose,
+  onSuccess,
+}: VariantFormProps) {
+  const addVariant = useAddVariant();
+  const updateVariant = useUpdateVariant();
+
+  const [sku, setSku] = useState('');
+  const [barcode, setBarcode] = useState('');
+  const [price, setPrice] = useState('');
+  const [compareAtPrice, setCompareAtPrice] = useState('');
+  const [costPrice, setCostPrice] = useState('');
+  const [isActive, setIsActive] = useState(true);
+  const [attributes, setAttributes] = useState<VariantAttributeRow[]>([]);
+  const [error, setError] = useState('');
+
+  const isEditing = !!initialData?.id;
+
+  useEffect(() => {
+    if (initialData) {
+      setSku(initialData.sku ?? '');
+      setBarcode(initialData.barcode ?? '');
+      setPrice(
+        initialData.price !== null && initialData.price !== undefined
+          ? String(initialData.price)
+          : '',
+      );
+      setCompareAtPrice(
+        initialData.compareAtPrice !== null &&
+        initialData.compareAtPrice !== undefined
+          ? String(initialData.compareAtPrice)
+          : '',
+      );
+      setCostPrice(
+        initialData.costPrice !== null && initialData.costPrice !== undefined
+          ? String(initialData.costPrice)
+          : '',
+      );
+      setIsActive(initialData.isActive ?? true);
+
+      const rawAttributes = initialData.attributes ?? [];
+      const normalized = Array.isArray(rawAttributes)
+        ? rawAttributes.map((item: any) => ({
+            attributeId: item.attributeId ?? '',
+            attributeValueId: item.attributeValueId ?? '',
+          }))
+        : [];
+
+      setAttributes(normalized);
+    } else {
+      setSku('');
+      setBarcode('');
+      setPrice('');
+      setCompareAtPrice('');
+      setCostPrice('');
+      setIsActive(true);
+      setAttributes([]);
+    }
+
+    setError('');
+  }, [initialData, open]);
+
+  if (!open) return null;
+
+  const addAttributeRow = () => {
+    setAttributes((prev) => [
+      ...prev,
+      { attributeId: '', attributeValueId: '' },
+    ]);
+  };
+
+  const updateAttributeRow = (
+    index: number,
+    next: VariantAttributeRow,
+  ) => {
+    setAttributes((prev) =>
+      prev.map((item, i) => (i === index ? next : item)),
+    );
+  };
+
+  const removeAttributeRow = (index: number) => {
+    setAttributes((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    const cleanSku = sku.trim();
+    const cleanPrice = Number(price);
+
+    if (!cleanSku) {
+      setError('El SKU es obligatorio');
+      return;
+    }
+
+    if (Number.isNaN(cleanPrice)) {
+      setError('El precio es obligatorio');
+      return;
+    }
+
+    const cleanedAttributes = attributes.filter(
+      (item) => item.attributeId.trim() && item.attributeValueId.trim(),
+    );
+
+    try {
+      if (isEditing && initialData) {
+        const dto: UpdateProductVariantInput = {
+          sku: cleanSku,
+          barcode: barcode.trim() || undefined,
+          price: cleanPrice,
+          compareAtPrice: compareAtPrice.trim()
+            ? Number(compareAtPrice)
+            : undefined,
+          costPrice: costPrice.trim() ? Number(costPrice) : undefined,
+          isActive,
+          attributes: cleanedAttributes.length ? cleanedAttributes : undefined,
+        };
+
+        const updated = await updateVariant.mutateAsync({
+          productId: product.id,
+          variantId: initialData.id,
+          dto,
+        });
+
+        onSuccess(updated);
+      } else {
+        const dto: CreateProductVariantInput = {
+          sku: cleanSku,
+          barcode: barcode.trim() || undefined,
+          price: cleanPrice,
+          compareAtPrice: compareAtPrice.trim()
+            ? Number(compareAtPrice)
+            : undefined,
+          costPrice: costPrice.trim() ? Number(costPrice) : undefined,
+          isActive,
+          attributes: cleanedAttributes.length ? cleanedAttributes : undefined,
+        };
+
+        const updated = await addVariant.mutateAsync({
+          productId: product.id,
+          dto,
+        });
+
+        onSuccess(updated);
+      }
+
+      onClose();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Error al guardar la variante',
+      );
+    }
+  };
+
+  const loading = addVariant.isPending || updateVariant.isPending;
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 p-4 border rounded-lg bg-gray-50">
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">SKU *</label>
-          <input
-            {...register('sku')}
-            className="w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          {errors.sku && <p className="text-red-500 text-xs mt-1">{errors.sku.message}</p>}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold">
+            {isEditing ? 'Editar variante' : 'Nueva variante'}
+          </h2>
+
+          <button onClick={onClose} className="text-sm text-gray-500">
+            Cerrar
+          </button>
         </div>
 
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Precio *</label>
-          <input
-            {...register('price')}
-            type="number"
-            step="0.01"
-            className="w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          {errors.price && <p className="text-red-500 text-xs mt-1">{errors.price.message}</p>}
-        </div>
+        <p className="mb-4 text-sm text-gray-600">
+          Producto: <span className="font-medium">{product.name}</span>
+        </p>
 
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Talle</label>
-          <input
-            {...register('size')}
-            className="w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+        <form onSubmit={handleSubmit} className="grid gap-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">SKU</label>
+              <input
+                className="rounded-lg border px-3 py-2"
+                value={sku}
+                onChange={(e) => setSku(e.target.value)}
+                placeholder="Ej: REM-NEG-M"
+                required
+              />
+            </div>
 
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Color</label>
-          <input
-            {...register('color')}
-            className="w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Barcode</label>
+              <input
+                className="rounded-lg border px-3 py-2"
+                value={barcode}
+                onChange={(e) => setBarcode(e.target.value)}
+                placeholder="Código de barras"
+              />
+            </div>
+          </div>
 
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Precio comparativo</label>
-          <input
-            {...register('compareAtPrice')}
-            type="number"
-            step="0.01"
-            className="w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Precio</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                className="rounded-lg border px-3 py-2"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                required
+              />
+            </div>
 
-        <div className="flex items-end pb-1">
-          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-            <input {...register('isActive')} type="checkbox" className="rounded border-gray-300" />
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Precio comparativo</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                className="rounded-lg border px-3 py-2"
+                value={compareAtPrice}
+                onChange={(e) => setCompareAtPrice(e.target.value)}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Costo</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                className="rounded-lg border px-3 py-2"
+                value={costPrice}
+                onChange={(e) => setCostPrice(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={isActive}
+              onChange={(e) => setIsActive(e.target.checked)}
+            />
             Activa
           </label>
-        </div>
-      </div>
 
-      <div className="flex justify-end gap-2 pt-1">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-100"
-        >
-          Cancelar
-        </button>
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-        >
-          {isLoading ? 'Guardando...' : 'Guardar variante'}
-        </button>
+          <div className="grid gap-3">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Atributos</label>
+              <button
+                type="button"
+                onClick={addAttributeRow}
+                className="rounded-lg border px-3 py-1 text-sm"
+              >
+                Agregar atributo
+              </button>
+            </div>
+
+            {attributes.map((row, index) => (
+              <div
+                key={`${index}-${row.attributeId}-${row.attributeValueId}`}
+                className="grid gap-2 md:grid-cols-[1fr_1fr_auto]"
+              >
+                <input
+                  className="rounded-lg border px-3 py-2"
+                  value={row.attributeId}
+                  onChange={(e) =>
+                    updateAttributeRow(index, {
+                      ...row,
+                      attributeId: e.target.value,
+                    })
+                  }
+                  placeholder="attributeId"
+                />
+
+                <input
+                  className="rounded-lg border px-3 py-2"
+                  value={row.attributeValueId}
+                  onChange={(e) =>
+                    updateAttributeRow(index, {
+                      ...row,
+                      attributeValueId: e.target.value,
+                    })
+                  }
+                  placeholder="attributeValueId"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => removeAttributeRow(index)}
+                  className="rounded-lg border px-3 py-2 text-sm"
+                >
+                  Quitar
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg border px-4 py-2"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="rounded-lg bg-black px-4 py-2 text-white disabled:opacity-60"
+            >
+              {loading ? 'Guardando...' : 'Guardar variante'}
+            </button>
+          </div>
+        </form>
       </div>
-    </form>
+    </div>
   );
 }

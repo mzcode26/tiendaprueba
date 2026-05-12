@@ -13,12 +13,15 @@ import { CustomersModule } from './modules/customers/customers.module';
 import { SalesModule } from './modules/sales/sales.module';
 import { PosModule } from './modules/pos/pos.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { CategoriesModule } from './modules/categories/categories.module';
 
 // Guards / Filters / Interceptors
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from './modules/auth/guards/permissions.guard';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { BrandsModule } from './modules/brands/brands.module';
 
 @Module({
   imports: [
@@ -35,6 +38,9 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
     SalesModule,
     PosModule,
     ReportsModule,
+    DashboardModule,
+    CategoriesModule,
+    BrandsModule,
   ],
   providers: [
     // Global JWT guard — all routes protected by default

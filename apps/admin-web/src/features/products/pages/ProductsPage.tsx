@@ -1,132 +1,206 @@
 import { useState } from 'react';
-import { Plus, Search } from 'lucide-react';
-import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from '../hooks/useProducts';
-import { ProductsTable } from '../components/ProductsTable';
+import { useDeleteProduct, useProducts } from '../hooks/useProducts';
+import { ProductDetail } from '../components/ProductDetail';
 import { ProductForm } from '../components/ProductForm';
-import type { Product } from '../types/product.types';
-import type { ProductFormData } from '../schemas/product.schema';
-import { toast } from 'sonner';
+import { VariantForm } from '../components/VariantForm';
+import { ProductFilters } from '../components/ProductFilters';
+import { ProductsTable } from '../components/ProductsTable';
+import type {
+  Product,
+  ProductFilters as ProductFiltersType,
+  ProductVariant,
+} from '../types/product.types';
+
+
 
 export default function ProductsPage() {
-  const [search, setSearch] = useState('');
-  const [showForm, setShowForm] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState<ProductFiltersType>({
+    search: '',
+    categoryId: '',
+    brandId: '',
+    isActive: undefined,
+    page: 1,
+    limit: 20,
+  });
 
-  const { data, isLoading } = useProducts({ search, page, limit: 20 });
-  const createProduct = useCreateProduct();
-  const updateProduct = useUpdateProduct();
+  const [productFormOpen, setProductFormOpen] = useState(false);
+  const [variantFormOpen, setVariantFormOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editingVariant, setEditingVariant] = useState<ProductVariant | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+
+  const productsQuery = useProducts(filters);
   const deleteProduct = useDeleteProduct();
 
-  const handleSubmit = (formData: ProductFormData) => {
-    if (editingProduct) {
-      updateProduct.mutate({ id: editingProduct.id, data: formData }, {
-        onSuccess: () => { toast.success('Producto actualizado'); closeForm(); },
-        onError: () => toast.error('Error al actualizar'),
-      });
-    } else {
-      createProduct.mutate(formData, {
-        onSuccess: () => { toast.success('Producto creado'); closeForm(); },
-        onError: () => toast.error('Error al crear'),
-      });
+const products = productsQuery.data?.items ?? [];
+const total = productsQuery.data?.total ?? 0;
+const page = productsQuery.data?.page ?? 1;
+const limit = productsQuery.data?.limit ?? 20;
+const pages = productsQuery.data?.totalPages ?? Math.max(1, Math.ceil(total / limit));
+
+  const openNewProduct = () => {
+    setEditingProduct(null);
+    setProductFormOpen(true);
+  };
+
+  const openEditProduct = (product: Product) => {
+    setEditingProduct(product);
+    setProductFormOpen(true);
+  };
+
+  const openAddVariant = (product: Product) => {
+    setSelectedProduct(product);
+    setEditingVariant(null);
+    setVariantFormOpen(true);
+  };
+
+  const openEditVariant = (product: Product, variant: ProductVariant) => {
+    setSelectedProduct(product);
+    setEditingVariant(variant);
+    setVariantFormOpen(true);
+  };
+
+  const openDetail = (product: Product) => {
+    setSelectedProduct(product);
+    setDetailOpen(true);
+  };
+
+  const handleProductSaved = (product: Product) => {
+    setSelectedProduct(product);
+    setProductFormOpen(false);
+    setEditingProduct(null);
+    setDetailOpen(false);
+
+    if (!editingProduct) {
+      setVariantFormOpen(true);
     }
   };
 
-  const handleDelete = (product: Product) => {
-    if (!confirm(`¿Eliminar "${product.name}"?`)) return;
-    deleteProduct.mutate(product.id, {
-      onSuccess: () => toast.success('Producto eliminado'),
-      onError: () => toast.error('Error al eliminar'),
-    });
+  const handleVariantSaved = () => {
+    setVariantFormOpen(false);
+    setEditingVariant(null);
   };
 
-  const handleEdit = (product: Product) => {
-    setEditingProduct(product);
-    setShowForm(true);
+  const handleDelete = async (id: string) => {
+    const ok = window.confirm('¿Eliminar este producto?');
+    if (!ok) return;
+
+    try {
+      await deleteProduct.mutateAsync(id);
+
+      if (selectedProduct?.id === id) {
+        setDetailOpen(false);
+        setSelectedProduct(null);
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'No se pudo eliminar');
+    }
   };
-
-  const closeForm = () => {
-    setShowForm(false);
-    setEditingProduct(null);
-  };
-
-  const products = data?.data?.data ?? [];
-  const totalPages = data?.data?.totalPages ?? 1;
-
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Productos</h1>
-        <button onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">
-          <Plus className="w-4 h-4" /> Nuevo producto
+    <div className="space-y-6 p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">Productos</h1>
+          <p className="text-sm text-gray-500">Gestión de productos y variantes</p>
+        </div>
+
+        <button
+          onClick={openNewProduct}
+          className="rounded-lg bg-black px-4 py-2 text-white"
+        >
+          Nuevo producto
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white border rounded-xl p-4">
-        <div className="relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1); }}
-            placeholder="Buscar por nombre o SKU..."
-            className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-      </div>
+      <ProductFilters filters={filters} onChange={setFilters} />
 
-      {/* Table */}
-      <div className="bg-white border rounded-xl overflow-hidden">
-        {isLoading ? (
-          <div className="space-y-2 p-4">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-12 bg-gray-100 rounded animate-pulse" />
-            ))}
-          </div>
+      <div className="overflow-hidden rounded-2xl border bg-white">
+        {productsQuery.isLoading ? (
+          <div className="p-6 text-sm text-gray-500">Cargando productos...</div>
+        ) : productsQuery.isError ? (
+          <div className="p-6 text-sm text-red-600">Error cargando productos</div>
         ) : (
           <ProductsTable
             products={products}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
+            onEditProduct={openEditProduct}
+            onDeleteProduct={handleDelete}
+            onAddVariant={openAddVariant}
+            onEditVariant={openEditVariant}
+            onViewDetail={openDetail}
           />
-        )}
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex justify-center items-center gap-2 p-4 border-t">
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-              className="px-3 py-1 text-sm border rounded-lg disabled:opacity-40 hover:bg-gray-50">
-              Anterior
-            </button>
-            <span className="text-sm text-gray-500">Página {page} de {totalPages}</span>
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-              className="px-3 py-1 text-sm border rounded-lg disabled:opacity-40 hover:bg-gray-50">
-              Siguiente
-            </button>
-          </div>
         )}
       </div>
 
-      {/* Modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl w-full max-w-2xl p-6 my-8">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-lg font-bold">
-                {editingProduct ? 'Editar producto' : 'Nuevo producto'}
-              </h2>
-              <button onClick={closeForm} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
-            </div>
-            <ProductForm
-              product={editingProduct ?? undefined}
-              onSubmit={handleSubmit}
-              isLoading={createProduct.isPending || updateProduct.isPending}
-            />
-          </div>
+      <div className="flex items-center justify-between text-sm text-gray-500">
+        <span>
+          Página {page} de {pages}
+        </span>
+
+        <div className="flex gap-2">
+          <button
+            className="rounded-lg border px-3 py-1 disabled:opacity-50"
+            disabled={page <= 1}
+            onClick={() =>
+              setFilters((prev) => ({
+                ...prev,
+                page: (prev.page ?? 1) - 1,
+              }))
+            }
+          >
+            Anterior
+          </button>
+
+          <button
+            className="rounded-lg border px-3 py-1 disabled:opacity-50"
+            disabled={page >= pages}
+            onClick={() =>
+              setFilters((prev) => ({
+                ...prev,
+                page: (prev.page ?? 1) + 1,
+              }))
+            }
+          >
+            Siguiente
+          </button>
         </div>
-      )}
+      </div>
+
+      <ProductForm
+        open={productFormOpen}
+        initialData={editingProduct}
+        onClose={() => setProductFormOpen(false)}
+        onSuccess={handleProductSaved}
+      />
+
+      {selectedProduct ? (
+        <VariantForm
+          open={variantFormOpen}
+          product={selectedProduct}
+          initialData={editingVariant}
+          onClose={() => setVariantFormOpen(false)}
+          onSuccess={handleVariantSaved}
+        />
+      ) : null}
+
+      <ProductDetail
+        open={detailOpen}
+        product={selectedProduct}
+        onClose={() => setDetailOpen(false)}
+        onEditProduct={(product) => {
+          setDetailOpen(false);
+          openEditProduct(product);
+        }}
+        onAddVariant={(product) => {
+          setDetailOpen(false);
+          openAddVariant(product);
+        }}
+        onEditVariant={(product, variant) => {
+          setDetailOpen(false);
+          openEditVariant(product, variant);
+        }}
+      />
     </div>
   );
 }
