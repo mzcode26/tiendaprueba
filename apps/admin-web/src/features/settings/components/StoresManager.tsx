@@ -1,129 +1,230 @@
-import { useState } from 'react';
-import { Plus } from 'lucide-react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { storeSchema, type StoreFormData } from '../schemas/settings.schema';
-import { useStores, useCreateStore, useUpdateStore, useDeleteStore } from '../hooks/useSettings';
-import type { StoreSettings } from '../types/settings.types';
-import { toast } from 'sonner';
+import { useMemo, useState } from 'react';
+
+import {
+  useCreateStore,
+  useDeleteStore,
+  useStores,
+  useUpdateStore,
+} from '../hooks/useSettings';
+
+import type { Store } from '../types/settings.types';
+
+import type {
+  StoreFormValues,
+} from '../schemas/store.schema';
+
+import { StoreForm } from './StoreForm';
 
 export function StoresManager() {
-  const [showForm, setShowForm] = useState(false);
-  const [editingStore, setEditingStore] = useState<StoreSettings | null>(null);
+  const [selectedStore, setSelectedStore] =
+    useState<Store | null>(null);
 
-  const { data, isLoading } = useStores();
+  const [isFormOpen, setIsFormOpen] =
+    useState(false);
+
+  const [showInactive, setShowInactive] =
+    useState(false);
+
+  const {
+    data: stores = [],
+    isLoading,
+    isFetching,
+  } = useStores(showInactive);
+
   const createStore = useCreateStore();
+
   const updateStore = useUpdateStore();
+
   const deleteStore = useDeleteStore();
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<StoreFormData>({
-    resolver: zodResolver(storeSchema),
-    defaultValues: { isActive: true },
-  });
+  const isEditing = useMemo(
+    () => Boolean(selectedStore),
+    [selectedStore],
+  );
 
-  const handleEdit = (store: StoreSettings) => {
-    setEditingStore(store);
-    reset(store);
-    setShowForm(true);
-  };
+  function handleCreate() {
+    setSelectedStore(null);
+    setIsFormOpen(true);
+  }
 
-  const handleDelete = (store: StoreSettings) => {
-    if (!confirm(`¿Eliminar tienda "${store.name}"?`)) return;
-    deleteStore.mutate(store.id, {
-      onSuccess: () => toast.success('Tienda eliminada'),
-      onError: () => toast.error('Error al eliminar'),
-    });
-  };
+  function handleEdit(store: Store) {
+    setSelectedStore(store);
+    setIsFormOpen(true);
+  }
 
-  const onSubmit = (formData: StoreFormData) => {
-    if (editingStore) {
-      updateStore.mutate({ id: editingStore.id, data: formData }, {
-        onSuccess: () => { toast.success('Tienda actualizada'); setShowForm(false); setEditingStore(null); reset(); },
-        onError: () => toast.error('Error al actualizar'),
+  async function handleDelete(
+    store: Store,
+  ) {
+    const confirmed = window.confirm(
+      `¿Eliminar la sucursal "${store.name}"?`,
+    );
+
+    if (!confirmed) return;
+
+    await deleteStore.mutateAsync(store.id);
+  }
+
+  async function handleSubmit(
+    values: StoreFormValues,
+  ) {
+    if (selectedStore) {
+      await updateStore.mutateAsync({
+        id: selectedStore.id,
+        payload: values,
       });
     } else {
-      createStore.mutate(formData, {
-        onSuccess: () => { toast.success('Tienda creada'); setShowForm(false); reset(); },
-        onError: () => toast.error('Error al crear'),
-      });
+      await createStore.mutateAsync(values);
     }
-  };
 
-  if (isLoading) return <div className="h-32 bg-gray-100 rounded-xl animate-pulse" />;
+    setIsFormOpen(false);
+    setSelectedStore(null);
+  }
+
+  function handleCloseForm() {
+    setIsFormOpen(false);
+    setSelectedStore(null);
+  }
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h3 className="font-semibold text-gray-700">Tiendas</h3>
-        <button onClick={() => { setEditingStore(null); reset({ isActive: true }); setShowForm(true); }}
-          className="flex items-center gap-1 text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700">
-          <Plus className="w-4 h-4" /> Nueva tienda
-        </button>
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900">
+            Sucursales
+          </h2>
+
+          <p className="text-sm text-gray-500">
+            Administración de tiendas y puntos de venta
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <input
+              type="checkbox"
+              checked={showInactive}
+              onChange={(e) =>
+                setShowInactive(
+                  e.target.checked,
+                )
+              }
+              className="h-4 w-4 rounded border-gray-300"
+            />
+
+            Mostrar inactivas
+          </label>
+
+          <button
+            onClick={handleCreate}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Nueva sucursal
+          </button>
+        </div>
       </div>
 
-      {/* Store List */}
-      <div className="space-y-2">
-        {!data?.data?.length ? (
-          <p className="text-gray-400 text-sm text-center py-6">No hay tiendas registradas</p>
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className="border-b border-gray-200 px-4 py-3 text-sm text-gray-500">
+          {isLoading || isFetching
+            ? 'Cargando sucursales...'
+            : `${stores.length} sucursales encontradas`}
+        </div>
+
+        {stores.length === 0 &&
+        !isLoading ? (
+          <div className="px-4 py-10 text-center text-sm text-gray-500">
+            No hay sucursales registradas.
+          </div>
         ) : (
-          data.data.map(store => (
-            <div key={store.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-              <div>
-                <p className="font-medium text-sm">{store.name}</p>
-                <p className="text-xs text-gray-400">{store.address ?? 'Sin dirección'}</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className={`text-xs px-2 py-0.5 rounded-full ${
-                  store.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                }`}>
-                  {store.isActive ? 'Activa' : 'Inactiva'}
-                </span>
-                <button onClick={() => handleEdit(store)}
-                  className="text-xs text-gray-500 hover:text-blue-600">Editar</button>
-                <button onClick={() => handleDelete(store)}
-                  className="text-xs text-red-500 hover:text-red-700">Eliminar</button>
-              </div>
-            </div>
-          ))
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {stores.map((store) => (
+                  <tr
+                    key={store.id}
+                  >
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                      {store.name}
+                    </td>
+
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {store.address ||
+                        '-'}
+                    </td>
+
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {store.phone ||
+                        '-'}
+                    </td>
+
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {store.email ||
+                        '-'}
+                    </td>
+
+                    <td className="px-4 py-3 text-sm">
+                      <span
+                        className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
+                          store.isActive
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}
+                      >
+                        {store.isActive
+                          ? 'Activa'
+                          : 'Inactiva'}
+                      </span>
+                    </td>
+
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() =>
+                            handleEdit(
+                              store,
+                            )
+                          }
+                          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          Editar
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            handleDelete(
+                              store,
+                            )
+                          }
+                          className="rounded-lg border border-red-300 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
-      {/* Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl w-full max-w-md p-6">
-            <h3 className="font-bold text-lg mb-4">{editingStore ? 'Editar tienda' : 'Nueva tienda'}</h3>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
-                <input {...register('name')}
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
-                <input {...register('address')}
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
-                <input {...register('phone')}
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div className="flex items-center gap-2">
-                <input {...register('isActive')} type="checkbox" id="storeActive"
-                  className="rounded border-gray-300" />
-                <label htmlFor="storeActive" className="text-sm text-gray-700">Tienda activa</label>
-              </div>
-              <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={() => { setShowForm(false); setEditingStore(null); reset(); }}
-                  className="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">Cancelar</button>
-                <button type="submit" disabled={createStore.isPending || updateStore.isPending}
-                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                  {createStore.isPending || updateStore.isPending ? 'Guardando...' : 'Guardar'}
-                </button>
-              </div>
-            </form>
+      {isFormOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl">
+            <StoreForm
+              initialData={
+                selectedStore ??
+                undefined
+              }
+              isLoading={
+                createStore.isPending ||
+                updateStore.isPending
+              }
+              onSubmit={
+                handleSubmit
+              }
+            />
           </div>
         </div>
       )}

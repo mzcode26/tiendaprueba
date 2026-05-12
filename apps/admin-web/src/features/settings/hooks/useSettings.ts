@@ -1,50 +1,117 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+
 import { settingsService } from '../services/settings.service';
 
-export const useTenantSettings = () =>
-  useQuery({
-    queryKey: ['settings', 'tenant'],
-    queryFn: settingsService.getTenantSettings,
-  });
+import type {
+  CreateStoreInput,
+  UpdateStoreInput,
+} from '../types/settings.types';
 
-export const useUpdateTenantSettings = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: settingsService.updateTenantSettings,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['settings', 'tenant'] }),
-  });
+const SETTINGS_KEYS = {
+  all: ['settings'] as const,
+
+  stores: () =>
+    [...SETTINGS_KEYS.all, 'stores'] as const,
+
+  store: (id: string) =>
+    [...SETTINGS_KEYS.stores(), id] as const,
 };
 
-export const useStores = () =>
-  useQuery({
-    queryKey: ['stores'],
-    queryFn: settingsService.getStores,
-  });
+export function useStores(
+  includeInactive = false,
+) {
+  return useQuery({
+    queryKey: [
+      ...SETTINGS_KEYS.stores(),
+      { includeInactive },
+    ],
 
-export const useCreateStore = () => {
-  const qc = useQueryClient();
+    queryFn: () =>
+      settingsService.getStores(includeInactive),
+  });
+}
+
+export function useStore(
+  id: string,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: SETTINGS_KEYS.store(id),
+
+    queryFn: () =>
+      settingsService.getStoreById(id),
+
+    enabled:
+      enabled &&
+      Boolean(id),
+  });
+}
+
+export function useCreateStore() {
+  const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: settingsService.createStore,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['stores'] }),
-  });
-};
+    mutationFn: (
+      payload: CreateStoreInput,
+    ) =>
+      settingsService.createStore(payload),
 
-export const useUpdateStore = () => {
-  const qc = useQueryClient();
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: SETTINGS_KEYS.stores(),
+      });
+    },
+  });
+}
+
+export function useUpdateStore() {
+  const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Parameters<typeof settingsService.updateStore>[1] }) =>
-      settingsService.updateStore(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['stores'] }),
-  });
-};
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: UpdateStoreInput;
+    }) =>
+      settingsService.updateStore(
+        id,
+        payload,
+      ),
 
-export const useDeleteStore = () => {
-  const qc = useQueryClient();
+    onSuccess: async (
+      _data,
+      variables,
+    ) => {
+      await queryClient.invalidateQueries({
+        queryKey: SETTINGS_KEYS.stores(),
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: SETTINGS_KEYS.store(
+          variables.id,
+        ),
+      });
+    },
+  });
+}
+
+export function useDeleteStore() {
+  const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: settingsService.deleteStore,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['stores'] }),
-  });
-};
+    mutationFn: (id: string) =>
+      settingsService.deleteStore(id),
 
-export const useChangePassword = () =>
-  useMutation({ mutationFn: settingsService.changePassword });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: SETTINGS_KEYS.stores(),
+      });
+    },
+  });
+}

@@ -7,6 +7,7 @@ import LoadingSpinner from '../components/common/LoadingSpinner';
 import NotFound from '../pages/NotFound';
 import POSPage from '../features/sales/pages/POSPage';
 
+
 const LoginPage = lazy(() => import('../features/auth/pages/LoginPage'));
 const DashboardPage = lazy(() => import('../pages/DashboardPage'));
 const ProductsPage = lazy(() => import('../features/products/pages/ProductsPage'));

@@ -1,26 +1,89 @@
 import api from '../../../lib/axios';
-import type { TenantSettings, StoreSettings, ChangePasswordData } from '../types/settings.types';
-import type { ApiResponse } from '../../../types/api.types';
+
+import type {
+  TenantSettings,
+  Store,
+  CreateStoreInput,
+  UpdateStoreInput,
+  ChangePasswordData,
+} from '../types/settings.types';
 
 export const settingsService = {
   getTenantSettings: () =>
-    api.get<ApiResponse<TenantSettings>>('/settings/tenant').then(r => r.data),
+    api
+      .get<TenantSettings>('/settings/tenant')
+      .then((r) => r.data),
 
   updateTenantSettings: (data: Partial<TenantSettings>) =>
-    api.patch<ApiResponse<TenantSettings>>('/settings/tenant', data).then(r => r.data),
+    api
+      .patch<TenantSettings>('/settings/tenant', data)
+      .then((r) => r.data),
 
-  getStores: () =>
-    api.get<ApiResponse<StoreSettings[]>>('/stores').then(r => r.data),
+  getStores: async (
+    includeInactive = false,
+  ): Promise<Store[]> => {
+    const params = new URLSearchParams();
 
-  createStore: (data: Partial<StoreSettings>) =>
-    api.post<ApiResponse<StoreSettings>>('/stores', data).then(r => r.data),
+    if (includeInactive) {
+      params.append('includeInactive', 'true');
+    }
 
-  updateStore: (id: string, data: Partial<StoreSettings>) =>
-    api.patch<ApiResponse<StoreSettings>>(`/stores/${id}`, data).then(r => r.data),
+    const query = params.toString();
 
-  deleteStore: (id: string) =>
-    api.delete(`/stores/${id}`).then(r => r.data),
+    const url = query
+      ? `/stores?${query}`
+      : '/stores';
 
-  changePassword: (data: ChangePasswordData) =>
-    api.post('/auth/change-password', data).then(r => r.data),
+    const response = await api.get(url);
+
+    /**
+     * Compatibilidad:
+     * - backend devuelve array directo
+     * - o { data: [...] }
+     */
+    if (Array.isArray(response.data)) {
+      return response.data;
+    }
+
+    if (Array.isArray(response.data?.data)) {
+      return response.data.data;
+    }
+
+    return [];
+  },
+
+  getStoreById: async (id: string): Promise<Store> => {
+    const { data } = await api.get<Store>(
+      `/stores/${id}`,
+    );
+
+    return data;
+  },
+
+  createStore: (
+    data: CreateStoreInput,
+  ): Promise<Store> =>
+    api
+      .post<Store>('/stores', data)
+      .then((r) => r.data),
+
+  updateStore: (
+    id: string,
+    data: UpdateStoreInput,
+  ): Promise<Store> =>
+    api
+      .patch<Store>(`/stores/${id}`, data)
+      .then((r) => r.data),
+
+  deleteStore: (id: string): Promise<void> =>
+    api
+      .delete(`/stores/${id}`)
+      .then(() => undefined),
+
+  changePassword: (
+    data: ChangePasswordData,
+  ) =>
+    api
+      .post('/auth/change-password', data)
+      .then((r) => r.data),
 };

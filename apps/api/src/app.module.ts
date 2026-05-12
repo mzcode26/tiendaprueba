@@ -15,6 +15,7 @@ import { PosModule } from './modules/pos/pos.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { CategoriesModule } from './modules/categories/categories.module';
+import { StoresModule } from './modules/stores/stores.module';
 
 // Guards / Filters / Interceptors
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
@@ -41,6 +42,7 @@ import { BrandsModule } from './modules/brands/brands.module';
     DashboardModule,
     CategoriesModule,
     BrandsModule,
+    StoresModule,
   ],
   providers: [
     // Global JWT guard — all routes protected by default

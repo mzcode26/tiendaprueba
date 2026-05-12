@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useDeleteProduct, useProducts } from '../hooks/useProducts';
 import { ProductDetail } from '../components/ProductDetail';
 import { ProductForm } from '../components/ProductForm';

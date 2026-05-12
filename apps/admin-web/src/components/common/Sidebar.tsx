@@ -8,7 +8,7 @@ import {
   Users,
   BarChart3,
   Settings,
-  X
+  X,
 } from 'lucide-react';
 
 interface SidebarProps {
