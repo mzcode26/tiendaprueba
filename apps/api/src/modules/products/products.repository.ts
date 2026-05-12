@@ -18,65 +18,73 @@ export class ProductsRepository {
   constructor(private prisma: PrismaService) {}
 
   async findAll(
-    tenantId: string,
-    filters: {
-      search?: string;
-      categoryId?: string;
-      brandId?: string;
-      isActive?: boolean;
-      page?: number;
-      limit?: number;
-    },
-  ) {
-    const { search, categoryId, brandId, isActive, page = 1, limit = 20 } = filters;
-    const skip = (page - 1) * limit;
+  tenantId: string,
+  filters: {
+    search?: string;
+    categoryId?: string;
+    brandId?: string;
+    isActive?: boolean;
+    page?: number;
+    limit?: number;
+  },
+) {
+  const { search, categoryId, brandId, isActive, page = 1, limit = 20 } = filters;
+  const skip = (page - 1) * limit;
 
-    const where = {
-      tenantId,
-      deletedAt: null,
-      ...(isActive !== undefined && { isActive }),
-      ...(categoryId && { categoryId }),
-      ...(brandId && { brandId }),
-      ...(search && {
-        OR: [
-          { name: { contains: search, mode: 'insensitive' as const } },
-          { description: { contains: search, mode: 'insensitive' as const } },
-          { tags: { has: search } },
-        ],
-      }),
-    };
-
-    const [items, total] = await Promise.all([
-      this.prisma.product.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          category: true,
-          brand: true,
-          images: { orderBy: { position: 'asc' } },
+  const where = {
+    tenantId,
+    deletedAt: null,
+    ...(isActive !== undefined && { isActive }),
+    ...(categoryId && { categoryId }),
+    ...(brandId && { brandId }),
+    ...(search && {
+      OR: [
+        { name: { contains: search, mode: 'insensitive' as const } },
+        { description: { contains: search, mode: 'insensitive' as const } },
+        { tags: { has: search } },
+        {
           variants: {
-            where: { deletedAt: null },
-            include: {
-              attributes: {
-                include: { attribute: true, attributeValue: true },
-              },
+            some: {
+              deletedAt: null,
+              sku: { contains: search, mode: 'insensitive' as const },
             },
           },
         },
-      }),
-      this.prisma.product.count({ where }),
-    ]);
+      ],
+    }),
+  };
 
-    return {
-      items,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
-  }
+  const [items, total] = await Promise.all([
+    this.prisma.product.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        category: true,
+        brand: true,
+        images: { orderBy: { position: 'asc' } },
+        variants: {
+          where: { deletedAt: null },
+          include: {
+            attributes: {
+              include: { attribute: true, attributeValue: true },
+            },
+          },
+        },
+      },
+    }),
+    this.prisma.product.count({ where }),
+  ]);
+
+  return {
+    items,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+  };
+}
 
   async findById(id: string, tenantId: string) {
     return this.prisma.product.findFirst({

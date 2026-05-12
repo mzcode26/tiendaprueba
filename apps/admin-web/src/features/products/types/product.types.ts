@@ -133,3 +133,7 @@ export interface PaginatedResponse<T> {
   limit: number;
   totalPages: number;
 }
+export interface SelectOption {
+  id: string;
+  name: string;
+}
