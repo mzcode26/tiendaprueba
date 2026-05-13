@@ -1,32 +1,79 @@
-import { AlertTriangle, X } from 'lucide-react';
-import { useState } from 'react';
+import type { LowStockAlert } from '../types/inventory.types';
 
-interface Props {
-  lowStockCount: number;
-  outOfStockCount: number;
-  onFilterLowStock: () => void;
+interface LowStockBannerProps {
+  items: LowStockAlert[];
+  isLoading?: boolean;
+  onViewAll?: () => void;
 }
 
-export function LowStockBanner({ lowStockCount, outOfStockCount, onFilterLowStock }: Props) {
-  const [dismissed, setDismissed] = useState(false);
-  if (dismissed || (lowStockCount === 0 && outOfStockCount === 0)) return null;
+export function LowStockBanner({
+  items,
+  isLoading = false,
+  onViewAll,
+}: LowStockBannerProps) {
+  if (isLoading) {
+    return (
+      <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-500">
+        Cargando alertas de stock...
+      </div>
+    );
+  }
+
+  if (!items.length) {
+    return (
+      <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700">
+        No hay alertas de stock bajo en este momento.
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0" />
-        <p className="text-sm text-yellow-800">
-          {outOfStockCount > 0 && <><strong>{outOfStockCount}</strong> productos sin stock. </>}
-          {lowStockCount > 0 && <><strong>{lowStockCount}</strong> productos con stock bajo.</>}
-          {' '}
-          <button onClick={onFilterLowStock} className="underline font-medium hover:text-yellow-900">
-            Ver productos
+    <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-yellow-900">
+            Hay {items.length} productos con stock bajo
+          </h3>
+          <p className="mt-1 text-sm text-yellow-800">
+            Revisá las sucursales con bajo nivel de inventario para evitar quiebres de stock.
+          </p>
+        </div>
+
+        {onViewAll && (
+          <button
+            type="button"
+            onClick={onViewAll}
+            className="rounded-lg border border-yellow-300 bg-white px-4 py-2 text-sm font-medium text-yellow-900 hover:bg-yellow-100"
+          >
+            Ver inventario
           </button>
-        </p>
+        )}
       </div>
-      <button onClick={() => setDismissed(true)} className="text-yellow-500 hover:text-yellow-700">
-        <X className="h-4 w-4" />
-      </button>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {items.slice(0, 6).map((item) => (
+          <div
+            key={item.inventoryId}
+            className="rounded-lg border border-yellow-200 bg-white p-3"
+          >
+            <div className="text-sm font-medium text-gray-900">
+              {item.productName}
+            </div>
+            <div className="mt-1 text-sm text-gray-600">
+              SKU: {item.sku}
+            </div>
+            <div className="mt-1 text-sm text-gray-600">
+              {item.storeName}
+            </div>
+            <div className="mt-2 text-sm font-semibold text-yellow-700">
+              Stock: {item.quantity} / Mínimo: {item.minStock}
+            </div>
+            <div className="mt-1 text-sm text-yellow-800">
+              Déficit: {item.deficit}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

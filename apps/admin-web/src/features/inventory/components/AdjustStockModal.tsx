@@ -1,66 +1,203 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { adjustStockSchema, type AdjustStockFormData } from '../schemas/inventory.schema';
-import { useAdjustStock } from '../hooks/useInventory';
-import type { Inventory } from '../types/inventory.types';
 
-interface Props {
-  inventory: Inventory | null;
-  isOpen: boolean;
+import {
+  adjustStockSchema,
+  type AdjustStockFormValues,
+} from '../schemas/inventory.schema';
+
+import type { InventoryItem } from '../types/inventory.types';
+
+interface AdjustStockModalProps {
+  open: boolean;
+  item: InventoryItem | null;
+  isLoading?: boolean;
   onClose: () => void;
+  onSubmit: (values: AdjustStockFormValues) => void | Promise<void>;
 }
 
-const MOVEMENT_TYPES = [
-  { value: 'PURCHASE', label: 'Compra' },
-  { value: 'ADJUSTMENT', label: 'Ajuste' },
-  { value: 'LOSS', label: 'Pérdida' },
-  { value: 'RETURN', label: 'Devolución' },
-];
-
-export function AdjustStockModal({ inventory, isOpen, onClose }: Props) {
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<AdjustStockFormData>({
+export function AdjustStockModal({
+  open,
+  item,
+  isLoading = false,
+  onClose,
+  onSubmit,
+}: AdjustStockModalProps) {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    formState: { errors },
+  } = useForm<AdjustStockFormValues>({
     resolver: zodResolver(adjustStockSchema),
-    defaultValues: { type: 'ADJUSTMENT', quantity: 1, reason: '' },
+    defaultValues: {
+      storeId: '',
+      variantId: '',
+      type: 'ADD',
+      quantity: 0,
+      reason: '',
+      reference: '',
+    },
   });
-  const adjustStock = useAdjustStock();
-  const quantity = watch('quantity');
 
-  if (!isOpen || !inventory) return null;
+  const adjustmentType = watch('type');
 
-  const onSubmit = async (data: AdjustStockFormData) => {
-    await adjustStock.mutateAsync({ id: inventory.id, data });
-    onClose();
-  };
+  useEffect(() => {
+    if (open && item) {
+      reset({
+        storeId: item.storeId,
+        variantId: item.variantId,
+        type: 'ADD',
+        quantity: 0,
+        reason: '',
+        reference: '',
+      });
+    }
+  }, [open, item, reset]);
+
+  if (!open || !item) return null;
+
+  const productName =
+    item.variant?.productName ??
+    item.variant?.product?.name ??
+    'Producto';
+
+  const variantName =
+    item.variant?.variantName ??
+    item.variant?.name ??
+    item.variant?.sku ??
+    'Sin variante';
+
+  const storeName = item.store?.name ?? 'Sucursal';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-        <h2 className="text-lg font-semibold mb-1">Ajustar Stock</h2>
-        <p className="text-sm text-gray-500 mb-4">
-          {inventory.productVariant?.product?.name} — Stock actual: <strong>{inventory.quantity}</strong>
-        </p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl">
+        <div className="mb-5 flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">
+              Ajustar stock
+            </h3>
+            <p className="text-sm text-gray-500">
+              {productName} — {variantName} — {storeName}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-sm text-gray-500 hover:text-gray-700"
+          >
+            Cerrar
+          </button>
+        </div>
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <input type="hidden" {...register('storeId')} />
+          <input type="hidden" {...register('variantId')} />
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de movimiento</label>
-            <select {...register('type')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-              {MOVEMENT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Tipo de ajuste
+            </label>
+            <select
+              {...register('type')}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-blue-500"
+            >
+              <option value="ADD">Agregar stock</option>
+              <option value="REMOVE">Quitar stock</option>
+              <option value="SET">Establecer stock</option>
             </select>
+            {errors.type && (
+              <p className="mt-1 text-sm text-red-500">
+                {errors.type.message}
+              </p>
+            )}
           </div>
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad</label>
-            <input type="number" {...register('quantity')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            {errors.quantity && <p className="text-red-500 text-xs mt-1">{errors.quantity.message}</p>}
-            <p className="text-xs text-gray-400 mt-1">Stock resultante: {inventory.quantity + Number(quantity || 0)}</p>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Cantidad
+            </label>
+            <input
+              type="number"
+              min={0}
+              step="1"
+              {...register('quantity', {
+                valueAsNumber: true,
+              })}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500"
+            />
+            {errors.quantity && (
+              <p className="mt-1 text-sm text-red-500">
+                {errors.quantity.message}
+              </p>
+            )}
           </div>
+
+          <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-600">
+            {adjustmentType === 'ADD' && (
+              <p>La cantidad se sumará al stock actual.</p>
+            )}
+            {adjustmentType === 'REMOVE' && (
+              <p>La cantidad se restará del stock actual.</p>
+            )}
+            {adjustmentType === 'SET' && (
+              <p>La cantidad ingresada será el nuevo stock final.</p>
+            )}
+          </div>
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Motivo</label>
-            <input {...register('reason')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            {errors.reason && <p className="text-red-500 text-xs mt-1">{errors.reason.message}</p>}
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Observación
+            </label>
+            <textarea
+              rows={3}
+              {...register('reason')}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500"
+              placeholder="Motivo del ajuste"
+            />
+            {errors.reason && (
+              <p className="mt-1 text-sm text-red-500">
+                {errors.reason.message}
+              </p>
+            )}
           </div>
-          <div className="flex justify-end gap-3">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">Cancelar</button>
-            <button type="submit" disabled={adjustStock.isPending} className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">
-              {adjustStock.isPending ? 'Guardando...' : 'Guardar'}
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Referencia
+            </label>
+            <input
+              type="text"
+              {...register('reference')}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500"
+              placeholder="Factura, remito, nota interna..."
+            />
+            {errors.reference && (
+              <p className="mt-1 text-sm text-red-500">
+                {errors.reference.message}
+              </p>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isLoading ? 'Guardando...' : 'Guardar ajuste'}
             </button>
           </div>
         </form>

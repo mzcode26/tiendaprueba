@@ -1,42 +1,91 @@
-import { useEffect, useState } from 'react';
-import { Search } from 'lucide-react';
-import type { InventoryFiltersFormData } from '../schemas/inventory.schema';
+import { useMemo } from 'react';
+import type {
+  InventoryFiltersFormValues,
+} from '../schemas/inventory.schema';
+import type { Store } from '../../settings/types/settings.types';
 
-interface Props {
-  onFiltersChange: (filters: InventoryFiltersFormData) => void;
+interface InventoryFiltersProps {
+  values: InventoryFiltersFormValues;
+  onChange: (values: InventoryFiltersFormValues) => void;
+  onReset: () => void;
+  isLoading?: boolean;
 }
 
-export function InventoryFilters({ onFiltersChange }: Props) {
-  const [search, setSearch] = useState('');
-  const [lowStock, setLowStock] = useState(false);
-  const [outOfStock, setOutOfStock] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      onFiltersChange({ search, lowStock, outOfStock, page: 1, limit: 20 });
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [search, lowStock, outOfStock]);
+export function InventoryFilters({
+  values,
+  onChange,
+  onReset,
+  isLoading = false,
+}: InventoryFiltersProps) {
+  function handleFieldChange<K extends keyof InventoryFiltersFormValues>(
+    field: K,
+    value: InventoryFiltersFormValues[K],
+  ) {
+    onChange({
+      ...values,
+      [field]: value,
+    });
+  }
 
   return (
-    <div className="bg-white border rounded-xl p-4 flex flex-wrap gap-4 items-center">
-      <div className="relative flex-1 min-w-[200px]">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar por producto o SKU..."
-          className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        />
+    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-gray-700">
+            Buscar
+          </label>
+
+          <input
+            type="text"
+            value={values.search ?? ''}
+            onChange={(e) =>
+              handleFieldChange('search', e.target.value || undefined)
+            }
+            disabled={isLoading}
+            placeholder="Producto, SKU o código"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500"
+          />
+        </div>
+
+        <div className="flex items-end gap-4">
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={values.lowStock ?? false}
+              onChange={(e) =>
+                handleFieldChange('lowStock', e.target.checked)
+              }
+              disabled={isLoading}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            Bajo stock
+          </label>
+
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={values.outOfStock ?? false}
+              onChange={(e) =>
+                handleFieldChange('outOfStock', e.target.checked)
+              }
+              disabled={isLoading}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            Sin stock
+          </label>
+        </div>
+
+        <div className="flex items-end justify-start md:justify-end">
+          <button
+            type="button"
+            onClick={onReset}
+            disabled={isLoading}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Limpiar filtros
+          </button>
+        </div>
       </div>
-      <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-        <input type="checkbox" checked={lowStock} onChange={e => setLowStock(e.target.checked)} className="rounded" />
-        Stock bajo
-      </label>
-      <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-        <input type="checkbox" checked={outOfStock} onChange={e => setOutOfStock(e.target.checked)} className="rounded" />
-        Sin stock
-      </label>
     </div>
   );
 }

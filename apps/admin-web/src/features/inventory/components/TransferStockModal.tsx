@@ -1,59 +1,171 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { transferStockSchema, type TransferStockFormData } from '../schemas/inventory.schema';
-import { useTransferStock } from '../hooks/useInventory';
 
-interface Props {
-  isOpen: boolean;
+import {
+  transferStockSchema,
+  type TransferStockFormValues,
+} from '../schemas/inventory.schema';
+
+import type { InventoryItem } from '../types/inventory.types';
+import type { Store } from '../../settings/types/settings.types';
+
+interface TransferStockModalProps {
+  open: boolean;
+  item: InventoryItem | null;
+  stores: Store[];
+  isLoading?: boolean;
   onClose: () => void;
+  onSubmit: (values: TransferStockFormValues) => void | Promise<void>;
 }
 
-export function TransferStockModal({ isOpen, onClose }: Props) {
-  const { register, handleSubmit, formState: { errors } } = useForm<TransferStockFormData>({
+export function TransferStockModal({
+  open,
+  item,
+  stores,
+  isLoading = false,
+  onClose,
+  onSubmit,
+}: TransferStockModalProps) {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    formState: { errors },
+  } = useForm<TransferStockFormValues>({
     resolver: zodResolver(transferStockSchema),
+    defaultValues: {
+      fromStoreId: '',
+      toStoreId: '',
+      variantId: '',
+      quantity: 0,
+      notes: '',
+    },
   });
-  const transfer = useTransferStock();
 
-  if (!isOpen) return null;
+  const fromStoreId = watch('fromStoreId');
 
-  const onSubmit = async (data: TransferStockFormData) => {
-    await transfer.mutateAsync(data);
-    onClose();
-  };
+  useEffect(() => {
+    if (open && item) {
+      reset({
+        fromStoreId: item.storeId,
+        toStoreId: '',
+        variantId: item.variantId,
+        quantity: 0,
+        notes: '',
+      });
+    }
+  }, [open, item, reset]);
+
+  if (!open || !item) return null;
+
+  const destinationStores = stores.filter(
+    (store) => store.id !== fromStoreId && store.isActive,
+  );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-        <h2 className="text-lg font-semibold mb-4">Transferir Stock</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl">
+        <div className="mb-5 flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">
+              Transferir stock
+            </h3>
+            <p className="text-sm text-gray-500">
+              {item.variant?.productName ?? item.variant?.product?.name ?? 'Producto'} —{' '}
+              {item.variant?.variantName ?? item.variant?.name ?? item.variant?.sku ?? 'Sin variante'} —{' '}
+              {item.store?.name ?? 'Sucursal origen'}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-sm text-gray-500 hover:text-gray-700"
+          >
+            Cerrar
+          </button>
+        </div>
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <input type="hidden" {...register('fromStoreId')} />
+          <input type="hidden" {...register('variantId')} />
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tienda origen</label>
-            <input {...register('fromStoreId')} placeholder="ID de tienda origen" className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            {errors.fromStoreId && <p className="text-red-500 text-xs mt-1">{errors.fromStoreId.message}</p>}
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Sucursal destino
+            </label>
+            <select
+              {...register('toStoreId')}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-blue-500"
+            >
+              <option value="">Seleccionar sucursal</option>
+              {destinationStores.map((store) => (
+                <option key={store.id} value={store.id}>
+                  {store.name}
+                </option>
+              ))}
+            </select>
+            {errors.toStoreId && (
+              <p className="mt-1 text-sm text-red-500">
+                {errors.toStoreId.message}
+              </p>
+            )}
           </div>
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tienda destino</label>
-            <input {...register('toStoreId')} placeholder="ID de tienda destino" className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            {errors.toStoreId && <p className="text-red-500 text-xs mt-1">{errors.toStoreId.message}</p>}
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Cantidad a transferir
+            </label>
+            <input
+              type="number"
+              min={1}
+              step="1"
+              {...register('quantity', {
+                valueAsNumber: true,
+              })}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500"
+            />
+            {errors.quantity && (
+              <p className="mt-1 text-sm text-red-500">
+                {errors.quantity.message}
+              </p>
+            )}
           </div>
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Variante de producto (ID)</label>
-            <input {...register('productVariantId')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            {errors.productVariantId && <p className="text-red-500 text-xs mt-1">{errors.productVariantId.message}</p>}
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Observación
+            </label>
+            <textarea
+              rows={3}
+              {...register('notes')}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500"
+              placeholder="Motivo de la transferencia"
+            />
+            {errors.notes && (
+              <p className="mt-1 text-sm text-red-500">
+                {errors.notes.message}
+              </p>
+            )}
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad</label>
-            <input type="number" {...register('quantity')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            {errors.quantity && <p className="text-red-500 text-xs mt-1">{errors.quantity.message}</p>}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Motivo (opcional)</label>
-            <input {...register('reason')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          </div>
-          <div className="flex justify-end gap-3">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">Cancelar</button>
-            <button type="submit" disabled={transfer.isPending} className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">
-              {transfer.isPending ? 'Transfiriendo...' : 'Transferir'}
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isLoading ? 'Guardando...' : 'Transferir stock'}
             </button>
           </div>
         </form>
