@@ -30,6 +30,7 @@ async function main() {
     { name: 'create_inventory', module: 'inventory' },
     { name: 'edit_inventory', module: 'inventory' },
     { name: 'delete_inventory', module: 'inventory' },
+    { name: 'manage_inventory', module: 'inventory' },
     { name: 'view_sales', module: 'sales' },
     { name: 'create_sales', module: 'sales' },
     { name: 'edit_sales', module: 'sales' },

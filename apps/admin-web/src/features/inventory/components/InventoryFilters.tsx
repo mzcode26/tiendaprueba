@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
+
 import type {
   InventoryFiltersFormValues,
 } from '../schemas/inventory.schema';
-import type { Store } from '../../settings/types/settings.types';
+
 
 interface InventoryFiltersProps {
   values: InventoryFiltersFormValues;

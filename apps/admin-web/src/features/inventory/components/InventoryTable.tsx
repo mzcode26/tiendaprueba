@@ -1,4 +1,9 @@
 import type { InventoryItem } from '../types/inventory.types';
+import {
+  getInventoryProductName,
+  getInventoryStoreName,
+  getInventoryVariantName,
+} from '../utils/inventory-labels';
 
 interface InventoryTableProps {
   items: InventoryItem[];
@@ -7,6 +12,7 @@ interface InventoryTableProps {
   onTransfer?: (item: InventoryItem) => void;
   onMovements?: (item: InventoryItem) => void;
   onSettings?: (item: InventoryItem) => void;
+  productNameByVariantId?: Map<string, string>;
 }
 
 export function InventoryTable({
@@ -16,6 +22,7 @@ export function InventoryTable({
   onTransfer,
   onMovements,
   onSettings,
+  productNameByVariantId,
 }: InventoryTableProps) {
   if (isLoading) {
     return (
@@ -65,22 +72,17 @@ export function InventoryTable({
 
           <tbody className="divide-y divide-gray-200 bg-white">
             {items.map((item) => {
-              const productName =
-                item.variant?.productName ??
-                'Producto sin nombre';
+              const productName = getInventoryProductName(
+                item,
+                productNameByVariantId,
+              );
 
-              const variantName =
-                item.variant?.variantName ??
-                item.variant?.sku ??
-                item.variant?.barcode ??
-                'Sin variante';
-
-              const storeName =
-                item.store?.name ??
-                'Sucursal desconocida';
+              const variantName = getInventoryVariantName(item);
+              const storeName = getInventoryStoreName(item);
 
               const isOutOfStock = item.quantity <= 0;
-              const isLowStock = item.quantity > 0 && item.quantity <= item.minStock;
+              const isLowStock =
+                item.quantity > 0 && item.quantity <= item.minStock;
 
               const statusLabel = isOutOfStock
                 ? 'Sin stock'

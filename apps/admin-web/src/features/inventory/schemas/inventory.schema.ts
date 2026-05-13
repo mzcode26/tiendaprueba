@@ -64,27 +64,62 @@ export const adjustStockSchema = z.object({
 });
 
 export const transferStockSchema = z.object({
-  fromStoreId: z.string().min(1, 'La sucursal origen es obligatoria'),
-  toStoreId: z.string().min(1, 'La sucursal destino es obligatoria'),
-  variantId: z.string().min(1, 'La variante es obligatoria'),
+  fromStoreId: z
+    .string()
+    .min(
+      1,
+      'La sucursal origen es obligatoria',
+    ),
+
+  toStoreId: z
+    .string()
+    .min(
+      1,
+      'La sucursal destino es obligatoria',
+    ),
+
+  variantId: z
+    .string()
+    .min(
+      1,
+      'La variante es obligatoria',
+    ),
+
   quantity: z
     .number({
-      required_error: 'La cantidad es obligatoria',
+      required_error:
+        'La cantidad es obligatoria',
     })
-    .positive('La cantidad debe ser mayor a cero'),
-  notes: z
+    .positive(
+      'La cantidad debe ser mayor a cero',
+    ),
+
+  reason: z
     .string()
     .trim()
-    .max(255, 'La observación no puede superar los 255 caracteres')
+    .max(
+      255,
+      'La observación no puede superar los 255 caracteres',
+    )
+    .optional(),
+
+  reference: z
+    .string()
+    .trim()
+    .max(
+      100,
+      'La referencia no puede superar los 100 caracteres',
+    )
     .optional(),
 }).refine(
-  (data) => data.fromStoreId !== data.toStoreId,
+  (data) =>
+    data.fromStoreId !== data.toStoreId,
   {
-    message: 'La sucursal origen y destino no pueden ser iguales',
+    message:
+      'La sucursal origen y destino no pueden ser iguales',
     path: ['toStoreId'],
   },
 );
-
 
 export const inventorySettingsSchema =
   z.object({

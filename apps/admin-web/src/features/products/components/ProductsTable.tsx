@@ -27,7 +27,7 @@ export function ProductsTable({
 
   return (
     <table className="w-full text-left">
-      <thead className="border-b bg-gray-50 text-sm">
+      <thead className="border-b text-gray-800 text-sm">
         <tr>
           <th className="px-4 py-3">Nombre</th>
           <th className="px-4 py-3">Categoría</th>
@@ -40,13 +40,13 @@ export function ProductsTable({
 
       <tbody>
         {products.map((product) => (
-          <tr key={product.id} className="border-b text-sm">
+          <tr key={product.id} className="border-b text-sm text-gray-700">
             <td className="px-4 py-3">
               <div className="font-medium">{product.name}</div>
-              <div className="text-xs text-gray-500">{product.slug}</div>
+              <div className="text-xs">{product.slug}</div>
             </td>
 
-            <td className="px-4 py-3">
+            <td className="px-4 py-3 text-gray-800">
               {product.category?.name ?? '-'}
             </td>
 

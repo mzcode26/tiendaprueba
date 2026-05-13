@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { useStores } from '../../settings/hooks/useSettings';
+import { useProducts } from '../../products/hooks/useProducts';
 
 import {
   useAdjustStock,
+  useInitialStock,
   useInventoryByStore,
   useInventoryItem,
   useInventoryMovements,
@@ -18,6 +20,7 @@ import { LowStockBanner } from '../components/LowStockBanner';
 import { AdjustStockModal } from '../components/AdjustStockModal';
 import { TransferStockModal } from '../components/TransferStockModal';
 import { MovementsModal } from '../components/MovementsModal';
+import { InitialStockModal } from '../components/InitialStockModal';
 
 import type {
   InventoryItem,
@@ -33,6 +36,14 @@ import type {
 
 export default function InventoryPage() {
   const { data: stores = [], isLoading: storesLoading } = useStores(false);
+
+    const { data: productsResponse, isLoading: productsLoading } = useProducts({
+    isActive: true,
+    page: 1,
+    limit: 200,
+  });
+
+    const products = productsResponse?.items ?? [];
 
   const activeStores = useMemo(
     () => stores.filter((store) => store.isActive),
@@ -54,6 +65,7 @@ export default function InventoryPage() {
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [movementsModalOpen, setMovementsModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [initialStockModalOpen, setInitialStockModalOpen] = useState(false);
 
   useEffect(() => {
     if (!selectedStoreId && activeStores.length > 0) {
@@ -99,6 +111,7 @@ export default function InventoryPage() {
   );
 
   const adjustStockMutation = useAdjustStock();
+  const initialStockMutation = useInitialStock();
   const transferStockMutation = useTransferStock();
   const updateInventorySettingsMutation = useUpdateInventorySettings();
 
@@ -167,9 +180,7 @@ export default function InventoryPage() {
     (store) => store.id === selectedStoreId,
   );
 
-  const handleFiltersChange = (
-    values: InventoryFiltersFormValues,
-  ) => {
+  const handleFiltersChange = (values: InventoryFiltersFormValues) => {
     setFilters((prev) => ({
       ...prev,
       ...values,
@@ -208,7 +219,11 @@ export default function InventoryPage() {
     setSettingsModalOpen(true);
   };
 
-  const closeModals = () => {
+  const openInitialStockModal = () => {
+    setInitialStockModalOpen(true);
+  };
+
+  const closeItemModals = () => {
     setAdjustModalOpen(false);
     setTransferModalOpen(false);
     setMovementsModalOpen(false);
@@ -216,40 +231,73 @@ export default function InventoryPage() {
     setSelectedItem(null);
   };
 
-  const handleAdjustSubmit = async (
-    values: AdjustStockFormValues,
-  ) => {
+  const closeInitialStockModal = () => {
+    setInitialStockModalOpen(false);
+  };
+
+  const handleAdjustSubmit = async (values: AdjustStockFormValues) => {
     await adjustStockMutation.mutateAsync(values);
-    closeModals();
+    closeItemModals();
   };
 
-  const handleTransferSubmit = async (
-    values: TransferStockFormValues,
-  ) => {
+  const handleInitialStockSubmit = async (values: AdjustStockFormValues) => {
+    await initialStockMutation.mutateAsync({
+      storeId: values.storeId,
+      variantId: values.variantId,
+      quantity: values.quantity,
+      reason: values.reason ?? 'Carga de stock inicial',
+      reference: 'STOCK_INICIAL',
+    });
+
+    closeInitialStockModal();
+  };
+
+  const handleTransferSubmit = async (values: TransferStockFormValues) => {
     await transferStockMutation.mutateAsync(values);
-    closeModals();
+    closeItemModals();
   };
 
-  const handleSettingsSubmit = async (
-    values: InventorySettingsFormValues,
-  ) => {
+  const handleSettingsSubmit = async (values: InventorySettingsFormValues) => {
     await updateInventorySettingsMutation.mutateAsync(values);
-    closeModals();
+    closeItemModals();
   };
+
+  const productNameByVariantId = useMemo(() => {
+  const map = new Map<string, string>();
+
+  for (const product of products) {
+    for (const variant of product.variants ?? []) {
+      map.set(variant.id, product.name);
+    }
+  }
+
+  return map;
+}, [products]);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          Inventario
-        </h1>
-        <p className="text-sm text-gray-500">
-          Control de stock por sucursal, variantes, movimientos y niveles mínimos.
-        </p>
+    <div className="space-y-6 m-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Inventario
+          </h1>
+          <p className="text-sm text-gray-500">
+            Control de stock por sucursal, variantes, movimientos y niveles mínimos.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={openInitialStockModal}
+          disabled={!selectedStoreId || productsLoading}
+          className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Cargar stock inicial
+        </button>
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <label className="mb-1 block text-sm font-medium text-gray-700">
+        <label className="mb-1 block text-sm font-medium text-gray-800">
           Sucursal
         </label>
 
@@ -257,7 +305,7 @@ export default function InventoryPage() {
           value={selectedStoreId}
           onChange={(e) => setSelectedStoreId(e.target.value)}
           disabled={storesLoading}
-          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-blue-500"
+          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-blue-500 text-gray-700"
         >
           <option value="">Seleccionar sucursal</option>
           {activeStores.map((store) => (
@@ -270,18 +318,14 @@ export default function InventoryPage() {
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-sm text-gray-500">
-            Sucursal seleccionada
-          </p>
+          <p className="text-sm text-gray-500">Sucursal seleccionada</p>
           <p className="mt-2 text-lg font-semibold text-gray-900">
             {selectedStore?.name ?? 'Sin sucursal'}
           </p>
         </div>
 
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-sm text-gray-500">
-            Ítems visibles
-          </p>
+          <p className="text-sm text-gray-500">Ítems visibles</p>
           <p className="mt-2 text-lg font-semibold text-gray-900">
             {filteredItems.length}
           </p>
@@ -314,13 +358,24 @@ export default function InventoryPage() {
         onTransfer={openTransferModal}
         onMovements={openMovementsModal}
         onSettings={openSettingsModal}
+        productNameByVariantId={productNameByVariantId}
+      />
+
+      <InitialStockModal
+        open={initialStockModalOpen}
+        storeId={selectedStoreId}
+        storeName={selectedStore?.name}
+        products={products}
+        isLoading={initialStockMutation.isPending}
+        onClose={closeInitialStockModal}
+        onSubmit={handleInitialStockSubmit}
       />
 
       <AdjustStockModal
         open={adjustModalOpen}
         item={selectedItem}
         isLoading={adjustStockMutation.isPending}
-        onClose={closeModals}
+        onClose={closeItemModals}
         onSubmit={handleAdjustSubmit}
       />
 
@@ -329,7 +384,7 @@ export default function InventoryPage() {
         item={selectedItem}
         stores={stores}
         isLoading={transferStockMutation.isPending}
-        onClose={closeModals}
+        onClose={closeItemModals}
         onSubmit={handleTransferSubmit}
       />
 
@@ -338,7 +393,7 @@ export default function InventoryPage() {
         item={selectedItemDetail ?? selectedItem}
         movements={selectedMovements}
         isLoading={movementsLoading}
-        onClose={closeModals}
+        onClose={closeItemModals}
       />
 
       {settingsModalOpen && selectedItem && (
@@ -364,7 +419,7 @@ export default function InventoryPage() {
 
               <button
                 type="button"
-                onClick={closeModals}
+                onClick={closeItemModals}
                 className="text-sm text-gray-500 hover:text-gray-700"
               >
                 Cerrar
@@ -376,9 +431,7 @@ export default function InventoryPage() {
                 e.preventDefault();
 
                 const formData = new FormData(e.currentTarget);
-                const minStock = Number(
-                  formData.get('minStock') ?? 0,
-                );
+                const minStock = Number(formData.get('minStock') ?? 0);
 
                 handleSettingsSubmit({
                   storeId: selectedItem.storeId,
@@ -404,7 +457,7 @@ export default function InventoryPage() {
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={closeModals}
+                  onClick={closeItemModals}
                   className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
                   Cancelar
@@ -412,9 +465,7 @@ export default function InventoryPage() {
 
                 <button
                   type="submit"
-                  disabled={
-                    updateInventorySettingsMutation.isPending
-                  }
+                  disabled={updateInventorySettingsMutation.isPending}
                   className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {updateInventorySettingsMutation.isPending

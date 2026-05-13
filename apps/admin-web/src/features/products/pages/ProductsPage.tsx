@@ -198,14 +198,14 @@ export default function ProductsPage() {
         )}
       </div>
 
-      <div className="flex items-center justify-between text-sm text-gray-500">
+      <div className="flex items-center justify-between text-sm text-gray-800">
         <span>
           Página {page} de {pages}
         </span>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 text-gray-800">
           <button
-            className="rounded-lg border px-3 py-1 disabled:opacity-50"
+            className="rounded-lg border px-3 py-1 "
             disabled={page <= 1}
             onClick={() =>
               setFilters((prev) => ({
@@ -218,7 +218,7 @@ export default function ProductsPage() {
           </button>
 
           <button
-            className="rounded-lg border px-3 py-1 disabled:opacity-50"
+            className="rounded-lg border px-3 py-1 text-gray-800"
             disabled={page >= pages}
             onClick={() =>
               setFilters((prev) => ({

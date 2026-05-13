@@ -4,9 +4,9 @@ import { inventoryService } from '../services/inventory.service';
 
 import type {
   AdjustStockInput,
-  InventoryMovementType,
   InventoryItem,
   InventoryMovement,
+  InventoryMovementType,
   LowStockAlert,
   PaginatedResponse,
   TransferStockInput,
@@ -22,21 +22,38 @@ const INVENTORY_KEYS = {
     [...INVENTORY_KEYS.all, 'item', storeId, variantId] as const,
   lowStock: () => [...INVENTORY_KEYS.all, 'low-stock'] as const,
   movements: () => [...INVENTORY_KEYS.all, 'movements'] as const,
-  movementList: (
-    filters?: {
-      storeId?: string;
-      variantId?: string;
-      type?: InventoryMovementType;
-      page?: number;
-      limit?: number;
-    },
-  ) => [...INVENTORY_KEYS.movements(), filters ?? {}] as const,
+  movementList: (filters?: {
+    storeId?: string;
+    variantId?: string;
+    type?: InventoryMovementType;
+    page?: number;
+    limit?: number;
+  }) => [...INVENTORY_KEYS.movements(), filters ?? {}] as const,
 };
 
-export function useInventoryByStore(
+async function invalidateInventoryData(
+  queryClient: ReturnType<typeof useQueryClient>,
   storeId: string,
-  enabled = true,
+  variantId: string,
 ) {
+  await queryClient.invalidateQueries({
+    queryKey: INVENTORY_KEYS.storeList(storeId),
+  });
+
+  await queryClient.invalidateQueries({
+    queryKey: INVENTORY_KEYS.item(storeId, variantId),
+  });
+
+  await queryClient.invalidateQueries({
+    queryKey: INVENTORY_KEYS.lowStock(),
+  });
+
+  await queryClient.invalidateQueries({
+    queryKey: INVENTORY_KEYS.movements(),
+  });
+}
+
+export function useInventoryByStore(storeId: string, enabled = true) {
   return useQuery<InventoryItem[]>({
     queryKey: INVENTORY_KEYS.storeList(storeId),
     queryFn: () => inventoryService.getByStore(storeId),
@@ -51,12 +68,8 @@ export function useInventoryItem(
 ) {
   return useQuery<InventoryItem>({
     queryKey: INVENTORY_KEYS.item(storeId, variantId),
-    queryFn: () =>
-      inventoryService.getByVariantAndStore(storeId, variantId),
-    enabled:
-      enabled &&
-      Boolean(storeId) &&
-      Boolean(variantId),
+    queryFn: () => inventoryService.getByVariantAndStore(storeId, variantId),
+    enabled: enabled && Boolean(storeId) && Boolean(variantId),
   });
 }
 
@@ -92,24 +105,32 @@ export function useAdjustStock() {
     mutationFn: (payload: AdjustStockInput) =>
       inventoryService.adjustStock(payload),
     onSuccess: async (_data, variables) => {
-      await queryClient.invalidateQueries({
-        queryKey: INVENTORY_KEYS.storeList(variables.storeId),
-      });
+      await invalidateInventoryData(
+        queryClient,
+        variables.storeId,
+        variables.variantId,
+      );
+    },
+  });
+}
 
-      await queryClient.invalidateQueries({
-        queryKey: INVENTORY_KEYS.item(
-          variables.storeId,
-          variables.variantId,
-        ),
-      });
+export function useInitialStock() {
+  const queryClient = useQueryClient();
 
-      await queryClient.invalidateQueries({
-        queryKey: INVENTORY_KEYS.lowStock(),
-      });
-
-      await queryClient.invalidateQueries({
-        queryKey: INVENTORY_KEYS.movements(),
-      });
+  return useMutation({
+    mutationFn: (
+      payload: Omit<AdjustStockInput, 'type'>,
+    ) =>
+      inventoryService.adjustStock({
+        ...payload,
+        type: 'SET',
+      }),
+    onSuccess: async (_data, variables) => {
+      await invalidateInventoryData(
+        queryClient,
+        variables.storeId,
+        variables.variantId,
+      );
     },
   });
 }
