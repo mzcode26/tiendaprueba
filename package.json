@@ -1,7 +1,7 @@
 {
   "name": "tienda",
   "private": true,
-  "packageManager": "pnpm@9.8.0",
+  "packageManager": "pnpm@11.1.1",
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
