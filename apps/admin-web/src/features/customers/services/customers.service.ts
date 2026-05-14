@@ -19,5 +19,5 @@ export const customersService = {
     api.delete(`/customers/${id}`).then(r => r.data),
 
   getCustomerSales: (id: string) =>
-    api.get<ApiResponse<CustomerSale[]>>(`/customers/${id}/sales`).then(r => r.data),
+    api.get<ApiResponse<Customer[]>>(`/customers/${id}/sales`).then(r => r.data),
 };
