@@ -47,7 +47,7 @@ export class SalesService {
 
     // Validate payments sum
     const subtotal = dto.items.reduce(
-      (sum, item) => sum + item.unitPrice * item.quantity - (item.discount ?? 0),
+      (sum, item) => sum + item.unitPrice * item.quantity - (item.discountAmount ?? 0),
       0,
     );
     const total = subtotal - (dto.discountAmount ?? 0) + (dto.taxAmount ?? 0);

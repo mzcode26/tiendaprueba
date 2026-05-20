@@ -31,7 +31,7 @@ export class CreateSaleItemDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
-  discount?: number;
+  discountAmount?: number;
 }
 
 export class CreatePaymentDto {

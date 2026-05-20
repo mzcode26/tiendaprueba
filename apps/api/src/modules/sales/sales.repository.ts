@@ -130,8 +130,8 @@ export class SalesRepository {
             variant: { connect: { id: item.variantId } },
             quantity: item.quantity,
             unitPrice: item.unitPrice,
-            discount: item.discount ?? 0,
-            subtotal: item.unitPrice * item.quantity - (item.discount ?? 0),
+            discountAmount: item.discountAmount ?? 0,
+            subtotal: item.unitPrice * item.quantity - (item.discountAmount ?? 0),
           })),
         },
         payments: {

@@ -33,17 +33,7 @@ export const useCreateSale = () => {
 export const useCancelSale = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
-      salesService.cancelSale(id, reason),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sales'] }),
-  });
-};
-
-export const useAddPayment = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ saleId, data }: { saleId: string; data: unknown }) =>
-      salesService.addPayment(saleId, data),
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => salesService.cancelSale(id, reason),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['sales'] }),
   });
 };

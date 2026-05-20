@@ -15,12 +15,12 @@ import {
 } from '../hooks/useInventory';
 
 import { InventoryFilters } from '../components/InventoryFilters';
-import { InventoryTable } from '../components/InventoryTable';
 import { LowStockBanner } from '../components/LowStockBanner';
 import { AdjustStockModal } from '../components/AdjustStockModal';
 import { TransferStockModal } from '../components/TransferStockModal';
 import { MovementsModal } from '../components/MovementsModal';
 import { InitialStockModal } from '../components/InitialStockModal';
+import {InventoryProductsTable} from '../../../shared/InventoryProductsTable';
 
 import type {
   InventoryItem,
@@ -33,6 +33,7 @@ import type {
   TransferStockFormValues,
   InventorySettingsFormValues,
 } from '../schemas/inventory.schema';
+import { StoreSelector } from '../../../shared/StoreSelector';
 
 export default function InventoryPage() {
   const { data: stores = [], isLoading: storesLoading } = useStores(false);
@@ -297,23 +298,13 @@ export default function InventoryPage() {
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <label className="mb-1 block text-sm font-medium text-gray-800">
-          Sucursal
-        </label>
 
-        <select
-          value={selectedStoreId}
-          onChange={(e) => setSelectedStoreId(e.target.value)}
-          disabled={storesLoading}
-          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-blue-500 text-gray-700"
-        >
-          <option value="">Seleccionar sucursal</option>
-          {activeStores.map((store) => (
-            <option key={store.id} value={store.id}>
-              {store.name}
-            </option>
-          ))}
-        </select>
+        <StoreSelector
+        value={selectedStoreId}
+        onChange={setSelectedStoreId}
+        stores={activeStores}
+        loading={storesLoading}
+      />
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -351,16 +342,16 @@ export default function InventoryPage() {
         isLoading={storesLoading}
       />
 
-      <InventoryTable
+      <InventoryProductsTable
         items={filteredItems}
         isLoading={inventoryLoading || inventoryFetching}
+        mode="inventory"
         onAdjust={openAdjustModal}
         onTransfer={openTransferModal}
         onMovements={openMovementsModal}
         onSettings={openSettingsModal}
         productNameByVariantId={productNameByVariantId}
       />
-
       <InitialStockModal
         open={initialStockModalOpen}
         storeId={selectedStoreId}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { User, X } from 'lucide-react';
-import api from '../../../../lib/axios';
+import api from '../../../lib/axios';
 
 interface Customer {
   id: string;
@@ -15,21 +15,37 @@ interface Props {
   onSelect: (customer: Customer | null) => void;
 }
 
+function unwrapCustomers(payload: unknown): Customer[] {
+  if (Array.isArray(payload)) return payload as Customer[];
+  if (payload && typeof payload === 'object') {
+    const p = payload as { items?: Customer[]; data?: { items?: Customer[]; data?: Customer[] } };
+    if (Array.isArray(p.items)) return p.items;
+    if (Array.isArray(p.data?.items)) return p.data.items;
+    if (Array.isArray(p.data?.data)) return p.data.data;
+  }
+  return [];
+}
+
 export function CustomerSelector({ selectedCustomer, onSelect }: Props) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Customer[]>([]);
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    if (query.length < 2) { setResults([]); return; }
+    if (query.length < 2) {
+      setResults([]);
+      return;
+    }
+
     const timer = setTimeout(async () => {
       try {
         const { data } = await api.get('/customers', { params: { search: query, limit: 5 } });
-        setResults(data.data?.data ?? []);
+        setResults(unwrapCustomers(data?.data));
       } catch {
         setResults([]);
       }
     }, 300);
+
     return () => clearTimeout(timer);
   }, [query]);
 
@@ -42,9 +58,7 @@ export function CustomerSelector({ selectedCustomer, onSelect }: Props) {
             <p className="text-sm font-medium text-indigo-900">
               {selectedCustomer.firstName} {selectedCustomer.lastName}
             </p>
-            {selectedCustomer.email && (
-              <p className="text-xs text-indigo-600">{selectedCustomer.email}</p>
-            )}
+            {selectedCustomer.email && <p className="text-xs text-indigo-600">{selectedCustomer.email}</p>}
           </div>
         </div>
         <button onClick={() => onSelect(null)} className="text-indigo-400 hover:text-indigo-600">
@@ -58,22 +72,32 @@ export function CustomerSelector({ selectedCustomer, onSelect }: Props) {
     <div className="relative">
       <input
         value={query}
-        onChange={e => { setQuery(e.target.value); setIsOpen(true); }}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setIsOpen(true);
+        }}
         onFocus={() => setIsOpen(true)}
         placeholder="Buscar cliente (opcional)..."
         className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
       />
+
       {isOpen && results.length > 0 && (
         <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto">
-          {results.map(c => (
+          {results.map((c) => (
             <button
               key={c.id}
-              onClick={() => { onSelect(c); setQuery(''); setIsOpen(false); }}
+              onClick={() => {
+                onSelect(c);
+                setQuery('');
+                setIsOpen(false);
+              }}
               className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-left border-b last:border-0"
             >
               <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
               <div>
-                <p className="text-sm font-medium">{c.firstName} {c.lastName}</p>
+                <p className="text-sm font-medium">
+                  {c.firstName} {c.lastName}
+                </p>
                 {c.email && <p className="text-xs text-gray-500">{c.email}</p>}
               </div>
             </button>
