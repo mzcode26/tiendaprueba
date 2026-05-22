@@ -20,7 +20,6 @@ export default function CustomersPage() {
   const createCustomer = useCreateCustomer();
   const updateCustomer = useUpdateCustomer();
   const deleteCustomer = useDeleteCustomer();
-
 const buildCreatePayload = (formData: CustomerFormData) => {
   const payload = {
     firstName: formData.firstName.trim(),
