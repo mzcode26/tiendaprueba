@@ -1,7 +1,6 @@
 export type SaleStatus = 'PENDING' | 'COMPLETED' | 'CANCELLED' | 'REFUNDED';
 
-export type SalePaymentMethod = 'CASH' | 'CARD' | 'TRANSFER' | 'OTHER';
-export type SaleAnyPaymentMethod = SalePaymentMethod | 'CARD_DEBIT' | 'CARD_CREDIT' | 'QR' | string;
+export type SalePaymentMethod = 'CASH' | 'CARD' | 'TRANSFER' | 'OTHER'| 'CARD_DEBIT' | 'CARD_CREDIT' | 'QR' ;
 
 export type PaymentStatus = 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
 
@@ -51,7 +50,7 @@ export interface SaleItem {
 
 export interface Payment {
   id: string;
-  method: SaleAnyPaymentMethod;
+  method: SalePaymentMethod;
   amount: number;
   status: PaymentStatus;
   reference?: string | null;

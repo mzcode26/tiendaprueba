@@ -30,7 +30,7 @@ interface Props {
 
   onDiscountChange?: (
     variantId: string,
-    discount: number,
+    discountAmount: number,
   ) => void;
 }
 

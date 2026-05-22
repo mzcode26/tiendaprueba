@@ -26,13 +26,23 @@ const PAYMENT_METHODS: Array<{
     icon: <Banknote className="h-4 w-4" />,
   },
   {
-    value: 'CARD',
-    label: 'Tarjeta',
+    value: 'CARD_DEBIT',
+    label: 'Tarjeta débito',
+    icon: <CreditCard className="h-4 w-4" />,
+  },
+  {
+    value: 'CARD_CREDIT',
+    label: 'Tarjeta crédito',
     icon: <CreditCard className="h-4 w-4" />,
   },
   {
     value: 'TRANSFER',
     label: 'Transferencia',
+    icon: <ArrowRightLeft className="h-4 w-4" />,
+  },
+  {
+    value: 'QR',
+    label: 'QR',
     icon: <ArrowRightLeft className="h-4 w-4" />,
   },
   {
@@ -58,12 +68,9 @@ export function POSPaymentModal({
 
   const createSale = useCreateSale();
 
-  const [paymentMethod, setPaymentMethod] =
-    useState<SalePaymentMethod>('CASH');
-  const [cashReceived, setCashReceived] =
-    useState('');
-  const [reference, setReference] =
-    useState('');
+  const [paymentMethod, setPaymentMethod] = useState<SalePaymentMethod>('CASH');
+  const [cashReceived, setCashReceived] = useState('');
+  const [reference, setReference] = useState('');
 
   const receivedAmount = Number(cashReceived || 0);
 
@@ -106,7 +113,7 @@ export function POSPaymentModal({
           variantId: item.variantId,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
-          discount: item.discountAmount,
+          discountAmount: item.discountAmount ?? 0,
         })),
         payments: [
           {
@@ -135,12 +142,8 @@ export function POSPaymentModal({
       <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b px-6 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              Cobrar venta
-            </h2>
-            <p className="text-sm text-gray-500">
-              Selecciona el método de pago
-            </p>
+            <h2 className="text-lg font-semibold text-gray-900">Cobrar venta</h2>
+            <p className="text-sm text-gray-500">Selecciona el método de pago</p>
           </div>
 
           <button
@@ -162,24 +165,18 @@ export function POSPaymentModal({
 
               <div className="flex items-center justify-between text-gray-600">
                 <span>Total unidades</span>
-                <span>
-                  {items.reduce((acc, item) => acc + item.quantity, 0)}
-                </span>
+                <span>{items.reduce((acc, item) => acc + item.quantity, 0)}</span>
               </div>
 
               <div className="flex items-center justify-between text-lg font-bold text-gray-900">
                 <span>Total</span>
-                <span className="text-blue-600">
-                  {formatCurrency(total)}
-                </span>
+                <span className="text-blue-600">{formatCurrency(total)}</span>
               </div>
             </div>
           </div>
 
           <div>
-            <p className="mb-2 text-sm font-medium text-gray-700">
-              Método de pago
-            </p>
+            <p className="mb-2 text-sm font-medium text-gray-700">Método de pago</p>
 
             <div className="grid grid-cols-2 gap-2">
               {PAYMENT_METHODS.map((method) => {

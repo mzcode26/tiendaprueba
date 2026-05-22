@@ -23,6 +23,8 @@ const PAYMENT_LABELS: Record<string, string> = {
   QR: 'QR',
 };
 
+const formatMoney = (value: unknown) => Number(value ?? 0).toFixed(2);
+
 export function SaleDetailModal({ saleId, isOpen, onClose }: Props) {
   const { data: sale, isLoading } = useSale(saleId ?? '');
 
@@ -77,19 +79,19 @@ export function SaleDetailModal({ saleId, isOpen, onClose }: Props) {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
               <div className="rounded-lg bg-gray-50 p-3">
                 <p className="text-xs uppercase text-gray-500">Subtotal</p>
-                <p className="font-semibold">${sale.subtotal.toFixed(2)}</p>
+                <p className="font-semibold">${formatMoney(sale.subtotal)}</p>
               </div>
               <div className="rounded-lg bg-gray-50 p-3">
                 <p className="text-xs uppercase text-gray-500">Descuento</p>
-                <p className="font-semibold">${sale.discountAmount.toFixed(2)}</p>
+                <p className="font-semibold">${formatMoney(sale.discountAmount)}</p>
               </div>
               <div className="rounded-lg bg-gray-50 p-3">
                 <p className="text-xs uppercase text-gray-500">Impuestos</p>
-                <p className="font-semibold">${sale.taxAmount.toFixed(2)}</p>
+                <p className="font-semibold">${formatMoney(sale.taxAmount)}</p>
               </div>
               <div className="rounded-lg bg-gray-50 p-3">
                 <p className="text-xs uppercase text-gray-500">Total</p>
-                <p className="font-semibold text-indigo-600">${sale.total.toFixed(2)}</p>
+                <p className="font-semibold text-indigo-600">${formatMoney(sale.total)}</p>
               </div>
             </div>
 
@@ -101,7 +103,7 @@ export function SaleDetailModal({ saleId, isOpen, onClose }: Props) {
                   const sku = item.variant?.sku ?? item.variantId;
                   const size = item.variant?.size;
                   const color = item.variant?.color;
-                  const itemDiscount = item.discountAmount ?? item.discountAmount ?? 0;
+                  const itemDiscount = item.discountAmount ?? item.discount ?? 0;
 
                   return (
                     <div key={item.id} className="flex justify-between items-center py-2 border-b last:border-0">
@@ -113,10 +115,10 @@ export function SaleDetailModal({ saleId, isOpen, onClose }: Props) {
                           {color ? ` · Color: ${color}` : ''}
                         </p>
                         {itemDiscount > 0 && (
-                          <p className="text-xs text-gray-400">Descuento: ${itemDiscount.toFixed(2)}</p>
+                          <p className="text-xs text-gray-400">Descuento: ${formatMoney(itemDiscount)}</p>
                         )}
                       </div>
-                      <p className="text-sm font-semibold">${item.subtotal.toFixed(2)}</p>
+                      <p className="text-sm font-semibold">${formatMoney(item.subtotal)}</p>
                     </div>
                   );
                 })}
@@ -129,7 +131,7 @@ export function SaleDetailModal({ saleId, isOpen, onClose }: Props) {
                 {sale.payments.map((p) => (
                   <div key={p.id} className="flex justify-between text-sm py-1">
                     <span className="text-gray-600">{PAYMENT_LABELS[p.method] ?? p.method}</span>
-                    <span className="font-medium">${p.amount.toFixed(2)}</span>
+                    <span className="font-medium">${formatMoney(p.amount)}</span>
                   </div>
                 ))}
               </div>

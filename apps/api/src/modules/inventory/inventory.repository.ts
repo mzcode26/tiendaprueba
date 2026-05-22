@@ -1,13 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { InventoryMovementType } from '@prisma/client';
+import { InventoryMovementType, Prisma } from '@prisma/client';
 
 @Injectable()
 export class InventoryRepository {
   constructor(private prisma: PrismaService) {}
 
-  async findByVariantAndStore(variantId: string, storeId: string, tenantId: string) {
-    return this.prisma.inventory.findFirst({
+  async findByVariantAndStore(
+    variantId: string,
+    storeId: string,
+    tenantId: string,
+    prisma: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    return prisma.inventory.findFirst({
       where: { variantId, storeId, tenantId },
       include: {
         variant: {
@@ -99,8 +104,9 @@ export class InventoryRepository {
     storeId: string,
     tenantId: string,
     delta: number,
+    prisma: Prisma.TransactionClient | PrismaService = this.prisma,
   ) {
-    return this.prisma.inventory.upsert({
+    return prisma.inventory.upsert({
       where: { variantId_storeId: { variantId, storeId } },
       create: { variantId, storeId, tenantId, quantity: Math.max(0, delta) },
       update: { quantity: { increment: delta } },
@@ -122,18 +128,21 @@ export class InventoryRepository {
     });
   }
 
-  async createMovement(params: {
-    tenantId: string;
-    inventoryId: string;           // ← ahora recibe inventoryId directamente
-    type: InventoryMovementType;
-    quantity: number;
-    previousQuantity: number;
-    newQuantity: number;
-    reason?: string;
-    referenceId?: string;
-    userId?: string;
-  }) {
-    return this.prisma.inventoryMovement.create({
+  async createMovement(
+    params: {
+      tenantId: string;
+      inventoryId: string;           // ← ahora recibe inventoryId directamente
+      type: InventoryMovementType;
+      quantity: number;
+      previousQuantity: number;
+      newQuantity: number;
+      reason?: string;
+      referenceId?: string;
+      userId?: string;
+    },
+    prisma: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    return prisma.inventoryMovement.create({
       data: {
         tenantId: params.tenantId,
         inventory: { connect: { id: params.inventoryId } },  // ← connect en lugar de campo directo

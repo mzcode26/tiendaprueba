@@ -31,13 +31,13 @@ export function POSItemModal({
 
   const [quantity, setQuantity] = useState(1);
   const [unitPrice, setUnitPrice] = useState(0);
-  const [discount, setDiscount] = useState(0);
+  const [discountAmount, setDiscountAmount] = useState(0);
 
   useEffect(() => {
     if (!item) return;
 
     setQuantity(1);
-    setDiscount(0);
+    setDiscountAmount(0);
 
     const fallbackPrice =
       Number(
@@ -54,8 +54,8 @@ export function POSItemModal({
   }, [quantity, unitPrice]);
 
   const total = useMemo(() => {
-    return Math.max(0, subtotal - discount);
-  }, [subtotal, discount]);
+    return Math.max(0, subtotal - discountAmount);
+  }, [subtotal, discountAmount]);
 
   const handleConfirm = () => {
     if (!item) return;
@@ -68,7 +68,7 @@ export function POSItemModal({
       sku,
       quantity,
       unitPrice,
-      discountAmount: discount,
+      discountAmount: discountAmount,
       inventoryItem: item,
     });
 
@@ -165,8 +165,8 @@ export function POSItemModal({
                 type="number"
                 min={0}
                 step="0.01"
-                value={discount}
-                onChange={(e) => setDiscount(Number(e.target.value))}
+                value={discountAmount}
+                onChange={(e) => setDiscountAmount(Number(e.target.value))}
                 className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -182,7 +182,7 @@ export function POSItemModal({
 
               <div className="flex items-center justify-between text-gray-600">
                 <span>Descuento</span>
-                <span>- {formatCurrency(discount)}</span>
+                <span>- {formatCurrency(discountAmount)}</span>
               </div>
 
               <div className="flex items-center justify-between text-base font-bold text-gray-900">

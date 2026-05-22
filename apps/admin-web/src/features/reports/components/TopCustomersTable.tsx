@@ -20,17 +20,21 @@ export function TopCustomersTable({ data, isLoading }: Props) {
             <tr>
               <th className="pb-2 text-left">#</th>
               <th className="pb-2 text-left">Cliente</th>
+              <th className="pb-2 text-left">Email</th>
               <th className="pb-2 text-right">Compras</th>
               <th className="pb-2 text-right">Total</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {data.map((c, i) => (
-              <tr key={c.customerId} className="hover:bg-gray-50">
-                <td className="py-2 text-gray-400">{i + 1}</td>
-                <td className="py-2 font-medium">{c.customerName}</td>
-                <td className="py-2 text-right">{c.salesCount}</td>
-                <td className="py-2 text-right font-medium">{formatCurrency(c.totalSpent)}</td>
+            {data.map((customer, index) => (
+              <tr key={customer.customerId} className="hover:bg-gray-50">
+                <td className="py-2 text-gray-400">{index + 1}</td>
+                <td className="py-2">
+                  <div className="font-medium">{customer.fullName}</div>
+                </td>
+                <td className="py-2 text-gray-500">{customer.email}</td>
+                <td className="py-2 text-right">{customer.totalOrders}</td>
+                <td className="py-2 text-right font-medium">{formatCurrency(customer.totalSpent)}</td>
               </tr>
             ))}
           </tbody>
