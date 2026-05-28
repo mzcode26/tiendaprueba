@@ -1,5 +1,11 @@
 export interface TenantSettings {
-  id: string;
+  general: GeneralSettings;
+  sales: SalesSettings;
+  inventory: InventorySettings;
+}
+
+
+export interface GeneralSettings {
   name: string;
   email?: string | null;
   phone?: string | null;
@@ -9,6 +15,17 @@ export interface TenantSettings {
   currency: string;
   timezone: string;
   logoUrl?: string | null;
+}
+
+export interface SalesSettings {
+  allowNegativeStock?: boolean;
+  defaultTax?: number;
+  invoicePrefix?: string;
+}
+
+export interface InventorySettings {
+  lowStockThreshold?: number;
+  trackMovements?: boolean;
 }
 
 export interface Store {

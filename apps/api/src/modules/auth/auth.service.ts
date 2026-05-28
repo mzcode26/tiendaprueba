@@ -18,8 +18,14 @@ export class AuthService {
     private configService: ConfigService,
   ) {}
 
-  async login(dto: LoginDto, tenantId: string): Promise<AuthResponseDto> {
-    const user = await this.authRepository.findUserByEmail(dto.email, tenantId);
+  async login(dto: LoginDto, tenantSlug: string): Promise<AuthResponseDto> {
+    const tenant = await this.authRepository.findTenantBySlug(tenantSlug);
+
+    if (!tenant) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const user = await this.authRepository.findUserByEmail(dto.email, tenant.id);
 
     if (!user || !user.isActive) {
       throw new UnauthorizedException('Invalid credentials');

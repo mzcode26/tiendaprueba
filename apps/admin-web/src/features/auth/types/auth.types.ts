@@ -8,9 +8,9 @@ export interface AuthUser {
   email: string;
   firstName: string;
   lastName: string;
-  name: string;
   tenantId: string;
   roles: string[];
+  permissions: string[];
 }
 
 export interface LoginResponse {

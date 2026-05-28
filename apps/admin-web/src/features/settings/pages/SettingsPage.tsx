@@ -1,53 +1,57 @@
 import { useState } from 'react';
-import { StoresManager } from '../components/StoresManager';
 
-type SettingsTab = 'general' | 'stores' | 'security';
+import { TenantSettingsForm } from '../components/TenantSettingsForm';
+import { StoresManager } from '../components/StoresManager';
+import { ChangePasswordForm } from '../components/ChangePasswordForm';
+
+type Tab = 'general' | 'stores' | 'security';
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('stores');
+  const [activeTab, setActiveTab] = useState<Tab>('general');
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Configuración</h1>
-        <p className="text-sm text-gray-500">
+        <h1 className="text-3xl font-bold tracking-tight">
+          Configuración
+        </h1>
+
+        <p className="text-muted-foreground">
           Administración general del sistema
         </p>
       </div>
 
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex flex-wrap gap-2">
+      {/* Tabs */}
+      <div className="border-b">
+        <nav className="flex gap-6">
           <button
-            type="button"
             onClick={() => setActiveTab('general')}
-            className={`border-b-2 px-4 py-2 text-sm font-medium transition ${
+            className={`pb-3 text-sm font-medium transition-colors ${
               activeTab === 'general'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             General
           </button>
 
           <button
-            type="button"
             onClick={() => setActiveTab('stores')}
-            className={`border-b-2 px-4 py-2 text-sm font-medium transition ${
+            className={`pb-3 text-sm font-medium transition-colors ${
               activeTab === 'stores'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             Sucursales
           </button>
 
           <button
-            type="button"
             onClick={() => setActiveTab('security')}
-            className={`border-b-2 px-4 py-2 text-sm font-medium transition ${
+            className={`pb-3 text-sm font-medium transition-colors ${
               activeTab === 'security'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             Seguridad
@@ -55,27 +59,18 @@ export default function SettingsPage() {
         </nav>
       </div>
 
+      {/* Content */}
       <div>
-        {activeTab === 'stores' && <StoresManager />}
-
         {activeTab === 'general' && (
-          <div className="rounded-xl border border-gray-200 bg-white p-6">
-            <h2 className="text-lg font-semibold text-gray-900">General</h2>
-            <p className="mt-2 text-sm text-gray-500">
-              Esta sección queda disponible para datos generales del sistema,
-              como nombre comercial, moneda, ubicación o identidad visual.
-            </p>
-          </div>
+          <TenantSettingsForm />
+        )}
+
+        {activeTab === 'stores' && (
+          <StoresManager />
         )}
 
         {activeTab === 'security' && (
-          <div className="rounded-xl border border-gray-200 bg-white p-6">
-            <h2 className="text-lg font-semibold text-gray-900">Seguridad</h2>
-            <p className="mt-2 text-sm text-gray-500">
-              Esta sección queda disponible para cambios de contraseña,
-              permisos, sesiones y controles de acceso.
-            </p>
-          </div>
+          <ChangePasswordForm />
         )}
       </div>
     </div>
