@@ -50,6 +50,16 @@ export class AuthRepository {
     });
   }
 
+  async updatePassword(userId: string, passwordHash: string) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash,
+        updatedAt: new Date(),
+      },
+    });
+  }
+
   async findTenantBySlug(slug: string) {
     return this.prisma.tenant.findUnique({ where: { slug } });
   }

@@ -1,12 +1,14 @@
 import {
   Injectable,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { AuthRepository } from './auth.repository';
 import { LoginDto } from './dto/login.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtPayload } from './types/jwt-payload.type';
 import { AuthResponseDto } from './dto/auth-response.dto';
 
@@ -130,6 +132,35 @@ export class AuthService {
       lastLoginAt: user.lastLoginAt,
       roles,
       permissions,
+    };
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    if (dto.newPassword !== dto.confirmPassword) {
+      throw new BadRequestException('Passwords do not match');
+    }
+
+    const user = await this.authRepository.findUserById(userId);
+
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const currentPasswordValid = await bcrypt.compare(
+      dto.currentPassword,
+      user.passwordHash,
+    );
+
+    if (!currentPasswordValid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const newPasswordHash = await bcrypt.hash(dto.newPassword, 10);
+
+    await this.authRepository.updatePassword(user.id, newPasswordHash);
+
+    return {
+      message: 'Password updated successfully',
     };
   }
 
