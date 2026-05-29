@@ -1,15 +1,21 @@
 import { Injectable } from '@nestjs/common';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { QuerySalesDto } from './dto/query-sales.dto';
 import { SaleStatus, PaymentMethod } from '@prisma/client';
+
+type DbClient = PrismaClient | Prisma.TransactionClient;
 
 const toNumber = (value: unknown): number => {
   const parsed = typeof value === 'number' ? value : Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const normalizePayment = <T extends { amount: unknown; installmentAmount?: unknown }>(payment: T) => ({
+const normalizePayment = <T extends {
+  amount: unknown;
+  installmentAmount?: unknown;
+}>(payment: T) => ({
   ...payment,
   amount: toNumber(payment.amount),
   installmentAmount:
@@ -18,7 +24,12 @@ const normalizePayment = <T extends { amount: unknown; installmentAmount?: unkno
       : toNumber(payment.installmentAmount),
 });
 
-const normalizeSaleItem = <T extends { quantity?: unknown; unitPrice?: unknown; discountAmount?: unknown; subtotal?: unknown }>(item: T) => ({
+const normalizeSaleItem = <T extends {
+  quantity?: unknown;
+  unitPrice?: unknown;
+  discountAmount?: unknown;
+  subtotal?: unknown;
+}>(item: T) => ({
   ...item,
   quantity: item.quantity === undefined ? item.quantity : toNumber(item.quantity),
   unitPrice: item.unitPrice === undefined ? item.unitPrice : toNumber(item.unitPrice),
@@ -26,15 +37,39 @@ const normalizeSaleItem = <T extends { quantity?: unknown; unitPrice?: unknown; 
   subtotal: toNumber(item.subtotal ?? 0),
 });
 
-const normalizeSale = <T extends { subtotal?: unknown; discountAmount?: unknown; taxAmount?: unknown; total?: unknown; payments?: unknown[]; items?: unknown[] }>(sale: T) => ({
+const normalizeSale = <T extends {
+  subtotal?: unknown;
+  discountAmount?: unknown;
+  taxAmount?: unknown;
+  total?: unknown;
+  payments?: unknown[];
+  items?: unknown[];
+}>(sale: T) => ({
   ...sale,
   subtotal: toNumber(sale.subtotal ?? 0),
   discountAmount: toNumber(sale.discountAmount ?? 0),
   taxAmount: toNumber(sale.taxAmount ?? 0),
   total: toNumber(sale.total ?? 0),
-  payments: Array.isArray(sale.payments) ? sale.payments.map((payment) => normalizePayment(payment as { amount: unknown; installmentAmount?: unknown })) : [],
-  items: Array.isArray(sale.items) ? sale.items.map((item) => normalizeSaleItem(item as { quantity?: unknown; unitPrice?: unknown; discountAmount?: unknown; subtotal?: unknown })) : [],
+  payments: Array.isArray(sale.payments)
+    ? sale.payments.map((payment) =>
+        normalizePayment(payment as {
+          amount: unknown;
+          installmentAmount?: unknown;
+        }),
+      )
+    : [],
+  items: Array.isArray(sale.items)
+    ? sale.items.map((item) =>
+        normalizeSaleItem(item as {
+          quantity?: unknown;
+          unitPrice?: unknown;
+          discountAmount?: unknown;
+          subtotal?: unknown;
+        }),
+      )
+    : [],
 });
+
 @Injectable()
 export class SalesRepository {
   constructor(private prisma: PrismaService) {}
@@ -46,7 +81,17 @@ export class SalesRepository {
   }
 
   async findAll(tenantId: string, query: QuerySalesDto) {
-    const { storeId, customerId, status, dateFrom, dateTo, search, page = 1, limit = 20 } = query;
+    const {
+      storeId,
+      customerId,
+      status,
+      dateFrom,
+      dateTo,
+      search,
+      page = 1,
+      limit = 20,
+    } = query;
+
     const skip = (page - 1) * limit;
 
     const where = {
@@ -67,8 +112,18 @@ export class SalesRepository {
           {
             customer: {
               OR: [
-                { firstName: { contains: search, mode: 'insensitive' as const } },
-                { lastName: { contains: search, mode: 'insensitive' as const } },
+                {
+                  firstName: {
+                    contains: search,
+                    mode: 'insensitive' as const,
+                  },
+                },
+                {
+                  lastName: {
+                    contains: search,
+                    mode: 'insensitive' as const,
+                  },
+                },
               ],
             },
           },
@@ -110,7 +165,9 @@ export class SalesRepository {
       include: {
         customer: true,
         store: true,
-        user: { select: { id: true, firstName: true, lastName: true, email: true } },
+        user: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
         items: {
           include: {
             variant: {
@@ -143,8 +200,9 @@ export class SalesRepository {
     dto: CreateSaleDto,
     subtotal: number,
     total: number,
+    db: DbClient = this.prisma as unknown as DbClient,
   ) {
-    const sale = await this.prisma.sale.create({
+    const sale = await db.sale.create({
       data: {
         tenantId,
         userId,
@@ -168,7 +226,7 @@ export class SalesRepository {
           })),
         },
         payments: {
-         create: (dto.payments ?? []).map((p) => ({
+          create: (dto.payments ?? []).map((p) => ({
             tenantId,
             method: p.method as PaymentMethod,
             amount: p.amount,
@@ -196,8 +254,13 @@ export class SalesRepository {
     return normalizeSale(sale);
   }
 
-  async updateStatus(id: string, status: SaleStatus, notes?: string) {
-    return this.prisma.sale.update({
+  async updateStatus(
+    id: string,
+    status: SaleStatus,
+    notes?: string,
+    db: DbClient = this.prisma as unknown as DbClient,
+  ) {
+    return db.sale.update({
       where: { id },
       data: {
         status,
