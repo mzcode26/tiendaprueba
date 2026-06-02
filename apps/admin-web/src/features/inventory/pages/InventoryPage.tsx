@@ -36,7 +36,7 @@ import type {
 import { StoreSelector } from '../../../shared/StoreSelector';
 
 export default function InventoryPage() {
-  const { data: stores = [], isLoading: storesLoading } = useStores(false);
+  const { data: stores = [], isLoading: storesLoading } = useStores();
 
     const { data: productsResponse, isLoading: productsLoading } = useProducts({
     isActive: true,

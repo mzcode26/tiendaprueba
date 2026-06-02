@@ -44,7 +44,7 @@ export function SalesTable({ sales, isLoading, onView, onCancel, pagination }: P
   const totalPages = Math.max(1, pagination.totalPages);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 text-gray-900">
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-gray-600 uppercase text-xs">

@@ -66,103 +66,103 @@ export function CustomerForm({ defaultValues, onSubmit, isLoading, onCancel }: P
   });
 
   return (
-    <form onSubmit={handleSubmit((values) => onSubmit(cleanPayload(values)))} className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+    <form onSubmit={handleSubmit((values) => onSubmit(cleanPayload(values)))} className="space-y-2 sm:space-y-3 md:space-y-4">
+      <div className="grid grid-cols-1 gap-2 sm:gap-3 md:gap-4 md:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Nombre *</label>
           <input
             {...register('firstName')}
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           {errors.firstName && <p className="text-red-500 text-xs mt-1">{errors.firstName.message}</p>}
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Apellido *</label>
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Apellido *</label>
           <input
             {...register('lastName')}
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           {errors.lastName && <p className="text-red-500 text-xs mt-1">{errors.lastName.message}</p>}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 sm:gap-3 md:gap-4 md:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Email</label>
           <input
             {...register('email')}
             type="email"
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Teléfono</label>
           <input
             {...register('phone')}
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 sm:gap-3 md:gap-4 md:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Dirección</label>
           <input
             {...register('address')}
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Ciudad</label>
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Ciudad</label>
           <input
             {...register('city')}
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 sm:gap-3 md:gap-4 md:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Provincia</label>
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Provincia</label>
           <input
             {...register('province')}
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Código postal</label>
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Código postal</label>
           <input
             {...register('postalCode')}
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 sm:gap-3 md:gap-4 md:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">CUIT / DNI / Identificador fiscal</label>
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">CUIT / DNI / Identificador fiscal</label>
           <input
             {...register('taxId')}
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de nacimiento</label>
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Fecha de nacimiento</label>
           <input
             {...register('birthDate')}
             type="date"
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 sm:gap-3 md:gap-4 md:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Género</label>
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Género</label>
           <select
             {...register('gender')}
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            className="w-full border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
           >
             <option value="">Sin definir</option>
             <option value="MALE">Masculino</option>
@@ -173,7 +173,7 @@ export function CustomerForm({ defaultValues, onSubmit, isLoading, onCancel }: P
           {errors.gender && <p className="text-red-500 text-xs mt-1">{errors.gender.message}</p>}
         </div>
         <div className="flex items-end">
-          <label className="flex items-center gap-2 text-sm text-gray-700">
+          <label className="flex items-center gap-2 text-xs sm:text-sm text-gray-700">
             <input {...register('isActive')} type="checkbox" className="rounded border-gray-300" />
             Cliente activo
           </label>
@@ -181,22 +181,22 @@ export function CustomerForm({ defaultValues, onSubmit, isLoading, onCancel }: P
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
+        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Notas</label>
         <textarea
           {...register('notes')}
           rows={3}
-          className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
-      <div className="flex justify-end gap-3 pt-2">
-        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">
+      <div className="flex justify-end gap-2 sm:gap-3 pt-2">
+        <button type="button" onClick={onCancel} className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm border rounded-lg hover:bg-gray-50">
           Cancelar
         </button>
         <button
           type="submit"
           disabled={isLoading}
-          className="px-4 py-2 text-sm bg-blue-600 text-gray-900 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-blue-600 text-gray-900 rounded-lg hover:bg-blue-700 disabled:opacity-50"
         >
           {isLoading ? 'Guardando...' : 'Guardar'}
         </button>

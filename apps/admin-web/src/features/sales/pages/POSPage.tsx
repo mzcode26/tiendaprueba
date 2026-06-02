@@ -31,7 +31,7 @@ export default function POSPage() {
         variantId: i.variantId,
         quantity: i.quantity,
         unitPrice: i.price,
-        discount: i.discount,
+        discount: i.discountAmount,
       })),
       payments: [{ method: 'CASH', amount: cart.total }],
     }, {

@@ -39,24 +39,24 @@ export function CustomerDetailModal({ customer, isOpen, onClose, onEdit }: Props
         </div>
 
         <div className="space-y-6 p-6">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div className="rounded-lg bg-gray-50 p-4">
+          <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-3">
+            <div className="rounded-lg bg-gray-50 p-3 sm:p-4">
               <p className="text-xs uppercase tracking-wide text-gray-500">Compras</p>
-              <p className="mt-1 text-2xl font-semibold">{isStatsLoading ? '—' : totalPurchases}</p>
+              <p className="mt-1 text-lg sm:text-2xl font-semibold">{isStatsLoading ? '—' : totalPurchases}</p>
             </div>
-            <div className="rounded-lg bg-gray-50 p-4">
+            <div className="rounded-lg bg-gray-50 p-3 sm:p-4">
               <p className="text-xs uppercase tracking-wide text-gray-500">Total gastado</p>
-              <p className="mt-1 text-2xl font-semibold">{isStatsLoading ? '—' : formatCurrency(totalSpent)}</p>
+              <p className="mt-1 text-lg sm:text-2xl font-semibold">{isStatsLoading ? '—' : formatCurrency(totalSpent)}</p>
             </div>
-            <div className="rounded-lg bg-gray-50 p-4">
+            <div className="rounded-lg bg-gray-50 p-3 sm:p-4">
               <p className="text-xs uppercase tracking-wide text-gray-500">Promedio</p>
-              <p className="mt-1 text-2xl font-semibold">
+              <p className="mt-1 text-lg sm:text-2xl font-semibold">
                 {isStatsLoading ? '—' : formatCurrency(stats?.averageOrderValue ?? 0)}
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 text-sm">
+          <div className="grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-2 text-xs sm:text-sm">
             <div>
               <span className="text-gray-500">Email:</span> <span className="ml-1">{detail.email ?? '—'}</span>
             </div>

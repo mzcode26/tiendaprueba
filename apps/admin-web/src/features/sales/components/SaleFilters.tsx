@@ -27,14 +27,14 @@ export function SaleFilters({ filters, onChange }: Props) {
   }, [search, filters, onChange]);
 
   return (
-    <div className="bg-white border rounded-xl p-4 flex flex-wrap gap-3">
-      <div className="relative flex-1 min-w-[200px]">
+    <div className="bg-white border rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3">
+      <div className="relative flex-1 min-w-full sm:min-w-[200px]">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar por número o cliente..."
-          className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="w-full pl-9 pr-3 py-1.5 sm:py-2 border rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
       </div>
 
@@ -47,7 +47,7 @@ export function SaleFilters({ filters, onChange }: Props) {
           page: 1,
         })
       }
-        className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        className="border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 flex-1 sm:flex-none sm:min-w-[150px]"
       >
         {STATUS_OPTIONS.map((o) => (
           <option key={o.value} value={o.value}>
@@ -60,14 +60,14 @@ export function SaleFilters({ filters, onChange }: Props) {
         type="date"
         value={filters.dateFrom ?? ''}
         onChange={(e) => onChange({ ...filters, dateFrom: e.target.value || undefined, page: 1 })}
-        className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        className="border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 flex-1 sm:flex-none"
       />
 
       <input
         type="date"
         value={filters.dateTo ?? ''}
         onChange={(e) => onChange({ ...filters, dateTo: e.target.value || undefined, page: 1 })}
-        className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        className="border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 flex-1 sm:flex-none"
       />
     </div>
   );

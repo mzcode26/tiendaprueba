@@ -28,10 +28,10 @@ export function InventoryFilters({
   }
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="rounded-lg border border-gray-200 bg-white p-3 sm:p-4 shadow-sm">
+      <div className="grid gap-2 sm:gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <div className="space-y-1">
-          <label className="text-sm font-medium text-gray-700">
+          <label className="text-xs sm:text-sm font-medium text-gray-700">
             Buscar
           </label>
 
@@ -43,12 +43,12 @@ export function InventoryFilters({
             }
             disabled={isLoading}
             placeholder="Producto, SKU o código"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500"
+            className="w-full rounded-lg border border-gray-300 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm outline-none transition focus:border-blue-500"
           />
         </div>
 
-        <div className="flex items-end gap-4">
-          <label className="flex items-center gap-2 text-sm text-gray-700">
+        <div className="flex items-end gap-2 sm:gap-3 md:gap-4 col-span-1 sm:col-span-2 lg:col-span-2">
+          <label className="flex items-center gap-2 text-xs sm:text-sm text-gray-700 whitespace-nowrap">
             <input
               type="checkbox"
               checked={values.lowStock ?? false}
@@ -61,7 +61,7 @@ export function InventoryFilters({
             Bajo stock
           </label>
 
-          <label className="flex items-center gap-2 text-sm text-gray-700">
+          <label className="flex items-center gap-2 text-xs sm:text-sm text-gray-700 whitespace-nowrap">
             <input
               type="checkbox"
               checked={values.outOfStock ?? false}
@@ -75,7 +75,7 @@ export function InventoryFilters({
           </label>
         </div>
 
-        <div className="flex items-end justify-start md:justify-end">
+        <div className="flex items-end justify-start lg:justify-end col-span-1 sm:col-span-2 lg:col-span-1 gap-2 sm:gap-3">
           <button
             type="button"
             onClick={onReset}

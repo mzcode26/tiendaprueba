@@ -23,32 +23,32 @@ export function ProductDetail({
   if (!open || !product) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-4xl rounded-2xl bg-white shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4 text-gray-900">
+      <div className="w-full max-w-4xl rounded-lg sm:rounded-2xl bg-white shadow-xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-start justify-between border-b p-6">
+        <div className="flex items-start justify-between border-b sticky top-0 bg-white p-3 sm:p-4 md:p-6">
           <div>
-            <h2 className="text-2xl font-semibold">
+            <h2 className="text-base sm:text-2xl font-semibold">
               {product.name}
             </h2>
 
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm">
               {product.slug}
             </p>
           </div>
 
           <button
             onClick={onClose}
-            className="text-sm text-gray-500"
+            className="text-xs sm:text-sm"
           >
             Cerrar
           </button>
         </div>
 
         {/* Content */}
-        <div className="grid gap-6 p-6 md:grid-cols-3">
+        <div className="grid gap-3 sm:gap-4 md:gap-6 p-3 sm:p-4 md:p-6 md:grid-cols-3 text-gray-800">
           {/* Main */}
-          <div className="space-y-6 md:col-span-2">
+          <div className="space-y-6 md:col-span-2 ">
             {/* Description */}
             <section className="space-y-2">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
@@ -62,8 +62,8 @@ export function ProductDetail({
 
             {/* Variants */}
             <section className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+              <div className="flex items-center justify-between text-gray-500">
+                <h3 className="text-sm font-semibold uppercase tracking-wide">
                   Variantes
                 </h3>
 

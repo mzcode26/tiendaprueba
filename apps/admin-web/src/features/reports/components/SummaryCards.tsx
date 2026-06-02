@@ -45,9 +45,9 @@ const cards = (summary: DashboardSummary) => [
 export function SummaryCards({ summary, isLoading }: Props) {
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-24 bg-gray-100 rounded-xl animate-pulse" />
+          <div key={i} className="h-24 sm:h-28 bg-gray-100 rounded-lg animate-pulse" />
         ))}
       </div>
     );
@@ -56,16 +56,16 @@ export function SummaryCards({ summary, isLoading }: Props) {
   if (!summary) return null;
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
       {cards(summary).map(({ label, value, helper, icon: Icon, color }) => (
-        <div key={label} className="bg-white rounded-xl p-4 border shadow-sm">
+        <div key={label} className="bg-white rounded-lg p-3 sm:p-4 border shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-500">{label}</span>
+            <span className="text-xs sm:text-sm text-gray-500">{label}</span>
             <div className={`p-2 rounded-lg ${colorMap[color]}`}>
               <Icon className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-bold text-gray-800">{value}</p>
+          <p className="text-xl sm:text-2xl font-bold text-gray-800">{value}</p>
           {helper ? <p className="mt-1 text-xs text-gray-400">{helper}</p> : null}
         </div>
       ))}

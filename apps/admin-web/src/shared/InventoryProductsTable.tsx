@@ -110,7 +110,7 @@ export function InventoryProductsTable({
 
               return (
                 <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 text-gray-900">
                     <div>
                       <p className="font-medium text-gray-900">{productName}</p>
                       {item.store?.name && (
@@ -119,7 +119,7 @@ export function InventoryProductsTable({
                     </div>
                   </td>
 
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 text-gray-900">
                     <span className="font-mono text-xs">
                       {item.variant?.sku ?? '—'}
                     </span>
@@ -166,7 +166,7 @@ export function InventoryProductsTable({
                   </td>
 
                   <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center justify-end gap-2 text-gray-900">
                       {mode === 'inventory' ? (
                         <>
                           <button

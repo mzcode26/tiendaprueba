@@ -64,7 +64,7 @@ export default function ReportsPage() {
   const { data: topCustomers, isLoading: loadingCustomers } = useTopCustomers(chartFilters);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-5 md:space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:justify-between lg:items-center">
         <div>
           <h1 className="text-2xl font-bold">Reportes</h1>

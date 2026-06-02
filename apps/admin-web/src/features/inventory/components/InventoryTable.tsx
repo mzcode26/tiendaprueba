@@ -26,7 +26,7 @@ export function InventoryTable({
 }: InventoryTableProps) {
   if (isLoading) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
+      <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm ">
         Cargando inventario...
       </div>
     );
@@ -34,7 +34,7 @@ export function InventoryTable({
 
   if (!items.length) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
+      <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm ">
         No hay stock para mostrar.
       </div>
     );
@@ -46,25 +46,25 @@ export function InventoryTable({
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide ">
                 Producto
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide ">
                 Variante
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide ">
                 Sucursal
               </th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide ">
                 Stock
               </th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide ">
                 Stock mínimo
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide ">
                 Estado
               </th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide ">
                 Acciones
               </th>
             </tr>
@@ -98,7 +98,7 @@ export function InventoryTable({
 
               return (
                 <tr key={item.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                  <td className="px-4 py-3 text-sm font-medium">
                     {productName}
                   </td>
 
@@ -110,11 +110,11 @@ export function InventoryTable({
                     {storeName}
                   </td>
 
-                  <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
+                  <td className="px-4 py-3 text-right text-sm font-semibold">
                     {item.quantity}
                   </td>
 
-                  <td className="px-4 py-3 text-right text-sm text-gray-600">
+                  <td className="px-4 py-3 text-right text-sm">
                     {item.minStock}
                   </td>
 
@@ -126,13 +126,13 @@ export function InventoryTable({
                     </span>
                   </td>
 
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 ">
                     <div className="flex justify-end gap-2">
                       {onAdjust && (
                         <button
                           type="button"
                           onClick={() => onAdjust(item)}
-                          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
                         >
                           Ajustar
                         </button>
@@ -142,7 +142,7 @@ export function InventoryTable({
                         <button
                           type="button"
                           onClick={() => onTransfer(item)}
-                          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
                         >
                           Transferir
                         </button>
@@ -152,7 +152,7 @@ export function InventoryTable({
                         <button
                           type="button"
                           onClick={() => onMovements(item)}
-                          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
                         >
                           Movimientos
                         </button>
@@ -162,7 +162,7 @@ export function InventoryTable({
                         <button
                           type="button"
                           onClick={() => onSettings(item)}
-                          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
                         >
                           Mínimo
                         </button>

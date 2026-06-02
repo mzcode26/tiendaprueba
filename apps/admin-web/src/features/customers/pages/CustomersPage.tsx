@@ -91,7 +91,7 @@ const handleSubmit = (formData: CustomerFormData) => {
   };
 
   return (
-    <div className="space-y-4 p-6">
+    <div className="space-y-3 p-3 sm:space-y-4 sm:p-4 md:space-y-6 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold">Clientes</h1>
         <button
