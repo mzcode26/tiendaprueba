@@ -99,7 +99,7 @@ const handleSubmit = (formData: CustomerFormData) => {
             setEditingCustomer(null);
             setShowForm(true);
           }}
-          className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+          className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm text-gray-900 hover:bg-blue-700"
         >
           <UserPlus className="h-4 w-4" /> Nuevo Cliente
         </button>

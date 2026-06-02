@@ -168,7 +168,7 @@ export default function ProductsPage() {
 
         <button
           onClick={openNewProduct}
-          className="rounded-lg bg-black px-4 py-2 text-white"
+          className="rounded-lg bg-black px-4 py-2 text-gray-100"
         >
           Nuevo producto
         </button>

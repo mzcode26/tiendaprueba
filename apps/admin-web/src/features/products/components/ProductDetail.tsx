@@ -221,7 +221,7 @@ export function ProductDetail({
 
             <button
               onClick={() => onEditProduct(product)}
-              className="w-full rounded-xl bg-black px-4 py-2 text-sm text-white"
+              className="w-full rounded-xl bg-black px-4 py-2 text-sm text-gray-100"
             >
               Editar producto
             </button>

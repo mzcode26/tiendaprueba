@@ -291,7 +291,7 @@ export default function InventoryPage() {
           type="button"
           onClick={openInitialStockModal}
           disabled={!selectedStoreId || productsLoading}
-          className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-gray-100 hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
         >
           Cargar stock inicial
         </button>
@@ -457,7 +457,7 @@ export default function InventoryPage() {
                 <button
                   type="submit"
                   disabled={updateInventorySettingsMutation.isPending}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {updateInventorySettingsMutation.isPending
                     ? 'Guardando...'

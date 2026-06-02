@@ -119,7 +119,7 @@ export function BrandModal({ open, onClose, onSuccess }: BrandModalProps) {
             <button
               type="submit"
               disabled={loading}
-              className="rounded-lg bg-black px-4 py-2 text-white disabled:opacity-60"
+              className="rounded-lg bg-black px-4 py-2 text-gray-100 disabled:opacity-60"
             >
               {loading ? 'Guardando...' : 'Guardar marca'}
             </button>

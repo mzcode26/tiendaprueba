@@ -251,7 +251,7 @@ export function POSPaymentModal({
           <button
             onClick={handleConfirm}
             disabled={createSale.isPending}
-            className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+            className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
           >
             {createSale.isPending ? 'Procesando...' : 'Confirmar venta'}
           </button>

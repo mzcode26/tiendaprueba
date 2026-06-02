@@ -224,7 +224,7 @@ export function TenantSettingsForm() {
         <button
           type="submit"
           disabled={!isDirty || updateSettings.isPending}
-          className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          className="px-4 py-2 text-sm bg-blue-600 text-gray-900 rounded-lg hover:bg-blue-700 disabled:opacity-50"
         >
           {updateSettings.isPending ? 'Guardando...' : 'Guardar cambios'}
         </button>

@@ -137,7 +137,7 @@ export function CustomerDetailModal({ customer, isOpen, onClose, onEdit }: Props
               onEdit(detail);
               onClose();
             }}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-gray-900 hover:bg-blue-700"
           >
             Editar
           </button>

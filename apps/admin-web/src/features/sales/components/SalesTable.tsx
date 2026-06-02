@@ -109,7 +109,7 @@ export function SalesTable({ sales, isLoading, onView, onCancel, pagination }: P
               key={i}
               onClick={() => pagination.onPageChange(i + 1)}
               className={`px-3 py-1 rounded text-sm ${
-                pagination.page === i + 1 ? 'bg-blue-600 text-white' : 'bg-gray-100'
+                pagination.page === i + 1 ? 'bg-blue-600 text-gray-900' : 'bg-gray-100'
               }`}
             >
               {i + 1}
