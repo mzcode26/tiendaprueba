@@ -31,27 +31,36 @@ export class SalesService {
   }
 
   async create(tenantId: string, userId: string, dto: CreateSaleDto) {
-    // Validate stock for all items
-    for (const item of dto.items) {
-      const inventory = await this.inventoryRepository.findByVariantAndStore(
-        item.variantId,
-        dto.storeId,
-        tenantId,
-      );
-      if (!inventory || inventory.quantity < item.quantity) {
-        throw new BadRequestException(
-          `Insufficient stock for variant ${item.variantId}`,
+    // Validar stock antes de abrir la transacción para reducir tiempo dentro del commit
+    await Promise.all(
+      dto.items.map(async (item) => {
+        const inventory = await this.inventoryRepository.findByVariantAndStore(
+          item.variantId,
+          dto.storeId,
+          tenantId,
         );
-      }
-    }
 
-    // Validate payments sum
+        if (!inventory || inventory.quantity < item.quantity) {
+          throw new BadRequestException(
+            `Insufficient stock for variant ${item.variantId}`,
+          );
+        }
+      }),
+    );
+
+    // Validar sumatoria de pagos
     const subtotal = dto.items.reduce(
-      (sum, item) => sum + item.unitPrice * item.quantity - (item.discount ?? 0),
+      (sum, item) =>
+        sum +
+        item.unitPrice * item.quantity -
+        (item.discountAmount ?? 0),
       0,
     );
     const total = subtotal - (dto.discountAmount ?? 0) + (dto.taxAmount ?? 0);
-    const paymentTotal = (dto.payments ?? []).reduce((sum, p) => sum + p.amount, 0);
+    const paymentTotal = (dto.payments ?? []).reduce(
+      (sum, p) => sum + p.amount,
+      0,
+    );
 
     if (paymentTotal < total) {
       throw new BadRequestException(
@@ -61,88 +70,118 @@ export class SalesService {
 
     const saleNumber = await this.salesRepository.generateSaleNumber(tenantId);
 
-    return this.prisma.$transaction(async () => {
-      const sale = await this.salesRepository.create(
-        tenantId,
-        userId,
-        saleNumber,
-        dto,
-        subtotal,
-        total,
-      );
-
-      // Decrement inventory for each item
-      for (const item of dto.items) {
-        const current = await this.inventoryRepository.findByVariantAndStore(
-          item.variantId,
-          dto.storeId,
+    return this.prisma.$transaction(
+      async (tx) => {
+        const sale = await this.salesRepository.create(
           tenantId,
-        );
-
-        const updated = await this.inventoryRepository.incrementStock(
-          item.variantId,
-          dto.storeId,
-          tenantId,
-          -item.quantity,
-        );
-
-        await this.inventoryRepository.createMovement({
-          tenantId,
-          inventoryId: updated.id,
-          type: InventoryMovementType.SALE,
-          quantity: item.quantity,
-          previousQuantity: current?.quantity ?? 0,
-          newQuantity: (current?.quantity ?? 0) - item.quantity,
-          referenceId: saleNumber,   // ← usamos saleNumber local, no sale.saleNumber
           userId,
-        });
-      }
+          saleNumber,
+          dto,
+          subtotal,
+          total,
+          tx,
+        );
 
-      return sale;
-    });
+        // Descontar inventario y registrar movimientos
+        for (const item of dto.items) {
+          const current = await this.inventoryRepository.findByVariantAndStore(
+            item.variantId,
+            dto.storeId,
+            tenantId,
+          );
+
+          const updated = await this.inventoryRepository.incrementStock(
+            item.variantId,
+            dto.storeId,
+            tenantId,
+            -item.quantity,
+          );
+
+          await this.inventoryRepository.createMovement({
+            tenantId,
+            inventoryId: updated.id,
+            type: InventoryMovementType.SALE,
+            quantity: item.quantity,
+            previousQuantity: current?.quantity ?? 0,
+            newQuantity: (current?.quantity ?? 0) - item.quantity,
+            referenceId: saleNumber,
+            userId,
+          });
+        }
+
+        return sale;
+      },
+      {
+        timeout: 20000,
+        maxWait: 10000,
+      },
+    );
   }
 
-  async cancel(id: string, tenantId: string, userId: string, dto: CancelSaleDto) {
+  async cancel(
+    id: string,
+    tenantId: string,
+    userId: string,
+    dto: CancelSaleDto,
+  ) {
     const sale = await this.findById(id, tenantId);
 
     if (sale.status !== 'COMPLETED' && sale.status !== 'PENDING') {
-      throw new BadRequestException('Only pending or completed sales can be cancelled');
+      throw new BadRequestException(
+        'Only pending or completed sales can be cancelled',
+      );
     }
 
-    return this.prisma.$transaction(async () => {
-      await this.salesRepository.updateStatus(id, 'CANCELLED', dto.reason);
-
-      for (const item of sale.items) {
-        const current = await this.inventoryRepository.findByVariantAndStore(
-          item.variantId,
-          sale.storeId,
-          tenantId,
+    return this.prisma.$transaction(
+      async (tx) => {
+        await this.salesRepository.updateStatus(
+          id,
+          'CANCELLED',
+          dto.reason,
+          tx,
         );
 
-        const updated = await this.inventoryRepository.incrementStock(
-          item.variantId,
-          sale.storeId,
-          tenantId,
-          item.quantity,
-        );
+        for (const item of sale.items) {
+          const current = await this.inventoryRepository.findByVariantAndStore(
+            item.variantId,
+            sale.storeId,
+            tenantId,
+          );
 
-        await this.inventoryRepository.createMovement({
-          tenantId,
-          inventoryId: updated.id,
-          type: InventoryMovementType.RETURN,
-          quantity: item.quantity,
-          previousQuantity: current?.quantity ?? 0,
-          newQuantity: (current?.quantity ?? 0) + item.quantity,
-          referenceId: (sale as any).number ?? id,  // ajustá al campo real del schema
-          userId,
-        });
-      }
+          const updated = await this.inventoryRepository.incrementStock(
+            item.variantId,
+            sale.storeId,
+            tenantId,
+            item.quantity,
+          );
 
-      return { message: 'Sale cancelled successfully' };
-    });
+          await this.inventoryRepository.createMovement({
+            tenantId,
+            inventoryId: updated.id,
+            type: InventoryMovementType.RETURN,
+            quantity: item.quantity,
+            previousQuantity: current?.quantity ?? 0,
+            newQuantity: (current?.quantity ?? 0) + item.quantity,
+            referenceId: sale.saleNumber,
+            userId,
+          });
+        }
+
+        return { message: 'Sale cancelled successfully' };
+      },
+      {
+        timeout: 20000,
+        maxWait: 10000,
+      },
+    );
   }
 
-  async refund(id: string, tenantId: string, userId: string, dto: CreateRefundDto) {
+  async refund(
+    id: string,
+    tenantId: string,
+    userId: string,
+    dto: CreateRefundDto,
+  ) {
     const sale = await this.findById(id, tenantId);
 
     if (sale.status !== 'COMPLETED') {
@@ -153,9 +192,13 @@ export class SalesService {
 
     for (const refundItem of dto.items) {
       const saleItem = saleItemsMap.get(refundItem.saleItemId);
+
       if (!saleItem) {
-        throw new BadRequestException(`Sale item ${refundItem.saleItemId} not found`);
+        throw new BadRequestException(
+          `Sale item ${refundItem.saleItemId} not found`,
+        );
       }
+
       if (refundItem.quantity > saleItem.quantity) {
         throw new BadRequestException(
           `Refund quantity exceeds sold quantity for item ${refundItem.saleItemId}`,
@@ -163,39 +206,45 @@ export class SalesService {
       }
     }
 
-    return this.prisma.$transaction(async () => {
-      await this.salesRepository.updateStatus(id, 'REFUNDED', dto.reason);
+    return this.prisma.$transaction(
+      async (tx) => {
+        await this.salesRepository.updateStatus(id, 'REFUNDED', dto.reason, tx);
 
-      for (const refundItem of dto.items) {
-        const saleItem = saleItemsMap.get(refundItem.saleItemId)!;
+        for (const refundItem of dto.items) {
+          const saleItem = saleItemsMap.get(refundItem.saleItemId)!;
 
-        const current = await this.inventoryRepository.findByVariantAndStore(
-          saleItem.variantId,
-          sale.storeId,
-          tenantId,
-        );
+          const current = await this.inventoryRepository.findByVariantAndStore(
+            saleItem.variantId,
+            sale.storeId,
+            tenantId,
+          );
 
-        const updated = await this.inventoryRepository.incrementStock(
-          saleItem.variantId,
-          sale.storeId,
-          tenantId,
-          refundItem.quantity,
-        );
+          const updated = await this.inventoryRepository.incrementStock(
+            saleItem.variantId,
+            sale.storeId,
+            tenantId,
+            refundItem.quantity,
+          );
 
-        await this.inventoryRepository.createMovement({
-          tenantId,
-          inventoryId: updated.id,
-          type: InventoryMovementType.RETURN,
-          quantity: refundItem.quantity,
-          previousQuantity: current?.quantity ?? 0,
-          newQuantity: (current?.quantity ?? 0) + refundItem.quantity,
-          referenceId: (sale as any).number ?? id,  // ajustá al campo real del schema
-          userId,
-        });
-      }
+          await this.inventoryRepository.createMovement({
+            tenantId,
+            inventoryId: updated.id,
+            type: InventoryMovementType.RETURN,
+            quantity: refundItem.quantity,
+            previousQuantity: current?.quantity ?? 0,
+            newQuantity: (current?.quantity ?? 0) + refundItem.quantity,
+            referenceId: sale.saleNumber,
+            userId,
+          });
+        }
 
-      return { message: 'Refund processed successfully' };
-    });
+        return { message: 'Refund processed successfully' };
+      },
+      {
+        timeout: 20000,
+        maxWait: 10000,
+      },
+    );
   }
 
   getSummary(

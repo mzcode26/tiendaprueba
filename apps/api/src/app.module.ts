@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD, APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { join } from 'path';
 
 import { PrismaModule } from './prisma/prisma.module';
 
@@ -16,19 +17,23 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { StoresModule } from './modules/stores/stores.module';
+import { BrandsModule } from './modules/brands/brands.module';
+import { SettingsModule } from './modules/settings/settings.module';
 
 // Guards / Filters / Interceptors
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from './modules/auth/guards/permissions.guard';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
-import { BrandsModule } from './modules/brands/brands.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      envFilePath: [
+        join(process.cwd(), 'apps/api/.env'),
+        join(process.cwd(), '.env'),
+      ],
     }),
     PrismaModule,
     AuthModule,
@@ -43,24 +48,21 @@ import { BrandsModule } from './modules/brands/brands.module';
     CategoriesModule,
     BrandsModule,
     StoresModule,
+    SettingsModule,
   ],
   providers: [
-    // Global JWT guard — all routes protected by default
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
     },
-    // Global permissions guard
     {
       provide: APP_GUARD,
       useClass: PermissionsGuard,
     },
-    // Global exception filter
     {
       provide: APP_FILTER,
       useClass: GlobalExceptionFilter,
     },
-    // Global response interceptor
     {
       provide: APP_INTERCEPTOR,
       useClass: ResponseInterceptor,

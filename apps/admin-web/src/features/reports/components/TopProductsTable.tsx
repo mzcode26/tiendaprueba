@@ -20,20 +20,21 @@ export function TopProductsTable({ data, isLoading }: Props) {
             <tr>
               <th className="pb-2 text-left">#</th>
               <th className="pb-2 text-left">Producto</th>
+              <th className="pb-2 text-left">SKU</th>
               <th className="pb-2 text-right">Unidades</th>
               <th className="pb-2 text-right">Ingresos</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {data.map((p, i) => (
-              <tr key={p.productId} className="hover:bg-gray-50">
-                <td className="py-2 text-gray-400">{i + 1}</td>
+            {data.map((product, index) => (
+              <tr key={product.productId} className="hover:bg-gray-50">
+                <td className="py-2 text-gray-400">{index + 1}</td>
                 <td className="py-2">
-                  <div className="font-medium">{p.productName}</div>
-                  <div className="text-xs text-gray-400">{p.sku}</div>
+                  <div className="font-medium">{product.productName}</div>
                 </td>
-                <td className="py-2 text-right">{p.quantitySold}</td>
-                <td className="py-2 text-right font-medium">{formatCurrency(p.revenue)}</td>
+                <td className="py-2 text-gray-500">{product.variantSku}</td>
+                <td className="py-2 text-right">{product.totalQuantity}</td>
+                <td className="py-2 text-right font-medium">{formatCurrency(product.totalRevenue)}</td>
               </tr>
             ))}
           </tbody>

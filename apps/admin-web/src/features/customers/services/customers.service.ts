@@ -1,23 +1,56 @@
 import api from '../../../lib/axios';
-import type { Customer, CustomerFilters } from '../types/customer.types';
-import type { ApiResponse, PaginatedResponse } from '../../../types/api.types';
+import type {
+  CustomerDetail,
+  CustomerFilters,
+  CustomerListResponse,
+  CustomerStats,
+  CustomerUpsertPayload,
+} from '../types/customer.types';
+
+type ApiWrapper<T> = {
+  success: boolean;
+  data: T;
+  timestamp?: string;
+};
+
+const sanitizePayload = (data: Partial<CustomerUpsertPayload>) => {
+  const entries = Object.entries(data).filter(([, value]) => value !== '' && value !== undefined && value !== null);
+  return Object.fromEntries(entries) as Record<string, unknown>;
+};
+
+const sanitizeCreatePayload = (data: Partial<CustomerUpsertPayload>) => {
+  const { isActive, ...rest } = data;
+  return sanitizePayload(rest);
+};
 
 export const customersService = {
-  getCustomers: (filters?: CustomerFilters) =>
-    api.get<PaginatedResponse<Customer>>('/customers', { params: filters }).then(r => r.data),
+  getCustomers: async (filters?: CustomerFilters): Promise<CustomerListResponse> => {
+    const response = await api.get<ApiWrapper<CustomerListResponse>>('/customers', { params: filters });
+    return response.data.data;
+  },
 
-  getCustomerById: (id: string) =>
-    api.get<ApiResponse<Customer>>(`/customers/${id}`).then(r => r.data),
+  getCustomerById: async (id: string): Promise<CustomerDetail> => {
+    const response = await api.get<ApiWrapper<CustomerDetail>>(`/customers/${id}`);
+    return response.data.data;
+  },
 
-  createCustomer: (data: Partial<Customer>) =>
-    api.post<ApiResponse<Customer>>('/customers', data).then(r => r.data),
+  getCustomerStats: async (id: string): Promise<CustomerStats> => {
+    const response = await api.get<ApiWrapper<CustomerStats>>(`/customers/${id}/stats`);
+    return response.data.data;
+  },
 
-  updateCustomer: (id: string, data: Partial<Customer>) =>
-    api.patch<ApiResponse<Customer>>(`/customers/${id}`, data).then(r => r.data),
+  createCustomer: async (data: CustomerUpsertPayload): Promise<CustomerDetail> => {
+    const response = await api.post<ApiWrapper<CustomerDetail>>('/customers', sanitizeCreatePayload(data));
+    return response.data.data;
+  },
 
-  deleteCustomer: (id: string) =>
-    api.delete(`/customers/${id}`).then(r => r.data),
+  updateCustomer: async (id: string, data: Partial<CustomerUpsertPayload>): Promise<CustomerDetail> => {
+    const response = await api.patch<ApiWrapper<CustomerDetail>>(`/customers/${id}`, sanitizePayload(data));
+    return response.data.data;
+  },
 
-  getCustomerSales: (id: string) =>
-    api.get<ApiResponse<CustomerSale[]>>(`/customers/${id}/sales`).then(r => r.data),
+  deleteCustomer: async (id: string) => {
+    const response = await api.delete(`/customers/${id}`);
+    return response.data;
+  },
 };

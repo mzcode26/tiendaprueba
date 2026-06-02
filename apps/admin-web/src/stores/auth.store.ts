@@ -6,8 +6,9 @@ interface AuthState {
   token: string | null;
   refreshToken: string | null;
   user: AuthUser | null;
+  tenantId: string | null;
   isAuthenticated: boolean;
-  setAuth: (token: string, refreshToken: string, user: AuthUser) => void;
+  setAuth: (token: string, refreshToken: string, user: AuthUser, tenantId?: string | null) => void;
   clearAuth: () => void;
 }
 
@@ -17,13 +18,26 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       refreshToken: null,
       user: null,
+      tenantId: null,
       isAuthenticated: false,
 
-      setAuth: (token, refreshToken, user) =>
-        set({ token, refreshToken, user, isAuthenticated: true }),
+      setAuth: (token, refreshToken, user, tenantId = null) =>
+        set({
+          token,
+          refreshToken,
+          user,
+          tenantId: tenantId ?? user.tenantId ?? null,
+          isAuthenticated: true,
+        }),
 
       clearAuth: () =>
-        set({ token: null, refreshToken: null, user: null, isAuthenticated: false }),
+        set({
+          token: null,
+          refreshToken: null,
+          user: null,
+          tenantId: null,
+          isAuthenticated: false,
+        }),
     }),
     {
       name: 'tienda-auth',
@@ -31,6 +45,7 @@ export const useAuthStore = create<AuthState>()(
         token: state.token,
         refreshToken: state.refreshToken,
         user: state.user,
+        tenantId: state.tenantId,
         isAuthenticated: state.isAuthenticated,
       }),
     }

@@ -48,9 +48,9 @@ const colorMap: Record<string, { bg: string; icon: string }> = {
 
 export function StatsGrid({ stats, isLoading }: Props) {
   if (isLoading) return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="h-28 bg-gray-100 rounded-xl animate-pulse" />
+        <div key={i} className="h-24 sm:h-28 bg-gray-100 rounded-lg animate-pulse" />
       ))}
     </div>
   );
@@ -58,19 +58,19 @@ export function StatsGrid({ stats, isLoading }: Props) {
   if (!stats) return null;
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
       {getCards(stats).map(({ label, value, sub, icon: Icon, color }) => {
         const { bg, icon } = colorMap[color];
         return (
-          <div key={label} className="bg-white rounded-xl border shadow-sm p-4 space-y-3">
+          <div key={label} className="bg-white rounded-lg border shadow-sm p-3 sm:p-4 space-y-2 sm:space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500">{label}</span>
+              <span className="text-xs sm:text-sm text-gray-500">{label}</span>
               <div className={`p-2 rounded-lg ${bg}`}>
                 <Icon className={`w-4 h-4 ${icon}`} />
               </div>
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-800">{value}</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-800">{value}</p>
               <p className="text-xs text-gray-400 mt-0.5">{sub}</p>
             </div>
           </div>

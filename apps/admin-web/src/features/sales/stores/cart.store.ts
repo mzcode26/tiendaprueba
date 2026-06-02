@@ -1,125 +1,107 @@
 import { create } from 'zustand';
-import type { CartItem, POSProduct } from '../types/sales.types';
+
+export interface CartItem {
+  variantId: string;
+  productName: string;
+  sku: string;
+  size?: string;
+  color?: string;
+  price: number;
+  quantity: number;
+  discountAmount: number;
+  subtotal: number;
+}
 
 interface CartStore {
   items: CartItem[];
-  customerId?: string;
-  storeId?: string;
-  globalDiscount: number;
-  subtotal: number;
   total: number;
   itemCount: number;
-  addItem: (product: POSProduct) => void;
+  customerId: string | null;
+  addItem: (item: Omit<CartItem, 'quantity' | 'discountAmount' | 'subtotal'>) => void;
   removeItem: (variantId: string) => void;
-  updateQuantity: (variantId: string, qty: number) => void;
-  updateItemDiscount: (variantId: string, discount: number) => void;
-  setCustomer: (customerId?: string) => void;
-  setStore: (storeId: string) => void;
-  setGlobalDiscount: (discount: number) => void;
+  updateQuantity: (variantId: string, quantity: number) => void;
   clearCart: () => void;
+  setCustomerId: (customerId: string | null) => void;
+  getTotal: () => number;
 }
-
-const calcSubtotal = (items: CartItem[]) =>
-  items.reduce((acc, i) => acc + i.subtotal, 0);
 
 export const useCartStore = create<CartStore>((set, get) => ({
   items: [],
-  customerId: undefined,
-  storeId: undefined,
-  globalDiscount: 0,
-  subtotal: 0,
   total: 0,
   itemCount: 0,
+  customerId: null,
 
-  addItem: (product) => {
-    const items = get().items;
-    const existing = items.find(i => i.variantId === product.variantId);
-    let updated: CartItem[];
+  addItem: (item) =>
+    set((state) => {
+      const existing = state.items.find((i) => i.variantId === item.variantId);
 
-    if (existing) {
-      updated = items.map(i =>
-        i.variantId === product.variantId
-          ? { ...i, quantity: i.quantity + 1, subtotal: (i.quantity + 1) * i.price * (1 - i.discount / 100) }
-          : i
+      let items: CartItem[];
+
+      if (existing) {
+        items = state.items.map((i) =>
+          i.variantId === item.variantId
+            ? {
+                ...i,
+                quantity: i.quantity + 1,
+                subtotal: (i.quantity + 1) * i.price - i.discountAmount,
+              }
+            : i,
+        );
+      } else {
+        items = [
+          ...state.items,
+          {
+            ...item,
+            quantity: 1,
+            discountAmount: 0,
+            subtotal: item.price,
+          },
+        ];
+      }
+
+      const total = items.reduce((sum, i) => sum + i.subtotal, 0);
+      const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
+
+      return { items, total, itemCount };
+    }),
+
+  removeItem: (variantId) =>
+    set((state) => {
+      const items = state.items.filter((i) => i.variantId !== variantId);
+      const total = items.reduce((sum, i) => sum + i.subtotal, 0);
+      const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
+
+      return { items, total, itemCount };
+    }),
+
+  updateQuantity: (variantId, quantity) =>
+    set((state) => {
+      if (quantity <= 0) {
+        const items = state.items.filter((i) => i.variantId !== variantId);
+        const total = items.reduce((sum, i) => sum + i.subtotal, 0);
+        const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
+        return { items, total, itemCount };
+      }
+
+      const items = state.items.map((i) =>
+        i.variantId === variantId
+          ? {
+              ...i,
+              quantity,
+              subtotal: quantity * i.price - i.discountAmount,
+            }
+          : i,
       );
-    } else {
-      updated = [...items, {
-        variantId: product.variantId,
-        sku: product.sku,
-        productName: product.productName,
-        size: product.size,
-        color: product.color,
-        price: product.price,
-        quantity: 1,
-        discount: 0,
-        subtotal: product.price,
-      }];
-    }
 
-    const subtotal = calcSubtotal(updated);
-    const globalDiscount = get().globalDiscount;
-    set({
-      items: updated,
-      subtotal,
-      total: subtotal * (1 - globalDiscount / 100),
-      itemCount: updated.reduce((acc, i) => acc + i.quantity, 0),
-    });
-  },
+      const total = items.reduce((sum, i) => sum + i.subtotal, 0);
+      const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
 
-  removeItem: (variantId) => {
-    const updated = get().items.filter(i => i.variantId !== variantId);
-    const subtotal = calcSubtotal(updated);
-    const globalDiscount = get().globalDiscount;
-    set({
-      items: updated,
-      subtotal,
-      total: subtotal * (1 - globalDiscount / 100),
-      itemCount: updated.reduce((acc, i) => acc + i.quantity, 0),
-    });
-  },
+      return { items, total, itemCount };
+    }),
 
-  updateQuantity: (variantId, qty) => {
-    if (qty < 1) return;
-    const updated = get().items.map(i =>
-      i.variantId === variantId
-        ? { ...i, quantity: qty, subtotal: qty * i.price * (1 - i.discount / 100) }
-        : i
-    );
-    const subtotal = calcSubtotal(updated);
-    const globalDiscount = get().globalDiscount;
-    set({
-      items: updated,
-      subtotal,
-      total: subtotal * (1 - globalDiscount / 100),
-      itemCount: updated.reduce((acc, i) => acc + i.quantity, 0),
-    });
-  },
+  clearCart: () => ({ items: [], total: 0, itemCount: 0, customerId: null }),
 
-  updateItemDiscount: (variantId, discount) => {
-    const updated = get().items.map(i =>
-      i.variantId === variantId
-        ? { ...i, discount, subtotal: i.quantity * i.price * (1 - discount / 100) }
-        : i
-    );
-    const subtotal = calcSubtotal(updated);
-    const globalDiscount = get().globalDiscount;
-    set({ items: updated, subtotal, total: subtotal * (1 - globalDiscount / 100) });
-  },
+  setCustomerId: (customerId) => set({ customerId }),
 
-  setCustomer: (customerId) => set({ customerId }),
-  setStore: (storeId) => set({ storeId }),
-
-  setGlobalDiscount: (discount) => {
-    const subtotal = get().subtotal;
-    set({ globalDiscount: discount, total: subtotal * (1 - discount / 100) });
-  },
-
-  clearCart: () => set({
-    items: [],
-    customerId: undefined,
-    globalDiscount: 0,
-    subtotal: 0,
-    total: 0,
-    itemCount: 0,
-  }),
+  getTotal: () => get().total,
 }));

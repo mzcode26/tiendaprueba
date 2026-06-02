@@ -1,8 +1,74 @@
 import { Injectable } from '@nestjs/common';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { QuerySalesDto } from './dto/query-sales.dto';
 import { SaleStatus, PaymentMethod } from '@prisma/client';
+
+type DbClient = PrismaClient | Prisma.TransactionClient;
+
+const toNumber = (value: unknown): number => {
+  const parsed = typeof value === 'number' ? value : Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const normalizePayment = <T extends {
+  amount: unknown;
+  installmentAmount?: unknown;
+}>(payment: T) => ({
+  ...payment,
+  amount: toNumber(payment.amount),
+  installmentAmount:
+    payment.installmentAmount === null || payment.installmentAmount === undefined
+      ? payment.installmentAmount
+      : toNumber(payment.installmentAmount),
+});
+
+const normalizeSaleItem = <T extends {
+  quantity?: unknown;
+  unitPrice?: unknown;
+  discountAmount?: unknown;
+  subtotal?: unknown;
+}>(item: T) => ({
+  ...item,
+  quantity: item.quantity === undefined ? item.quantity : toNumber(item.quantity),
+  unitPrice: item.unitPrice === undefined ? item.unitPrice : toNumber(item.unitPrice),
+  discountAmount: toNumber(item.discountAmount ?? 0),
+  subtotal: toNumber(item.subtotal ?? 0),
+});
+
+const normalizeSale = <T extends {
+  subtotal?: unknown;
+  discountAmount?: unknown;
+  taxAmount?: unknown;
+  total?: unknown;
+  payments?: unknown[];
+  items?: unknown[];
+}>(sale: T) => ({
+  ...sale,
+  subtotal: toNumber(sale.subtotal ?? 0),
+  discountAmount: toNumber(sale.discountAmount ?? 0),
+  taxAmount: toNumber(sale.taxAmount ?? 0),
+  total: toNumber(sale.total ?? 0),
+  payments: Array.isArray(sale.payments)
+    ? sale.payments.map((payment) =>
+        normalizePayment(payment as {
+          amount: unknown;
+          installmentAmount?: unknown;
+        }),
+      )
+    : [],
+  items: Array.isArray(sale.items)
+    ? sale.items.map((item) =>
+        normalizeSaleItem(item as {
+          quantity?: unknown;
+          unitPrice?: unknown;
+          discountAmount?: unknown;
+          subtotal?: unknown;
+        }),
+      )
+    : [],
+});
 
 @Injectable()
 export class SalesRepository {
@@ -15,7 +81,17 @@ export class SalesRepository {
   }
 
   async findAll(tenantId: string, query: QuerySalesDto) {
-    const { storeId, customerId, status, dateFrom, dateTo, search, page = 1, limit = 20 } = query;
+    const {
+      storeId,
+      customerId,
+      status,
+      dateFrom,
+      dateTo,
+      search,
+      page = 1,
+      limit = 20,
+    } = query;
+
     const skip = (page - 1) * limit;
 
     const where = {
@@ -36,8 +112,18 @@ export class SalesRepository {
           {
             customer: {
               OR: [
-                { firstName: { contains: search, mode: 'insensitive' as const } },
-                { lastName: { contains: search, mode: 'insensitive' as const } },
+                {
+                  firstName: {
+                    contains: search,
+                    mode: 'insensitive' as const,
+                  },
+                },
+                {
+                  lastName: {
+                    contains: search,
+                    mode: 'insensitive' as const,
+                  },
+                },
               ],
             },
           },
@@ -65,7 +151,7 @@ export class SalesRepository {
     ]);
 
     return {
-      items,
+      items: items.map((sale) => normalizeSale(sale)),
       total,
       page,
       limit,
@@ -74,12 +160,14 @@ export class SalesRepository {
   }
 
   async findById(id: string, tenantId: string) {
-    return this.prisma.sale.findFirst({
+    const sale = await this.prisma.sale.findFirst({
       where: { id, tenantId, deletedAt: null },
       include: {
         customer: true,
         store: true,
-        user: { select: { id: true, firstName: true, lastName: true, email: true } },
+        user: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
         items: {
           include: {
             variant: {
@@ -95,6 +183,8 @@ export class SalesRepository {
         payments: true,
       },
     });
+
+    return sale ? normalizeSale(sale) : null;
   }
 
   async findBySaleNumber(saleNumber: string, tenantId: string) {
@@ -110,8 +200,9 @@ export class SalesRepository {
     dto: CreateSaleDto,
     subtotal: number,
     total: number,
+    db: DbClient = this.prisma as unknown as DbClient,
   ) {
-    return this.prisma.sale.create({
+    const sale = await db.sale.create({
       data: {
         tenantId,
         userId,
@@ -130,12 +221,12 @@ export class SalesRepository {
             variant: { connect: { id: item.variantId } },
             quantity: item.quantity,
             unitPrice: item.unitPrice,
-            discount: item.discount ?? 0,
-            subtotal: item.unitPrice * item.quantity - (item.discount ?? 0),
+            discountAmount: item.discountAmount ?? 0,
+            subtotal: item.unitPrice * item.quantity - (item.discountAmount ?? 0),
           })),
         },
         payments: {
-         create: (dto.payments ?? []).map((p) => ({
+          create: (dto.payments ?? []).map((p) => ({
             tenantId,
             method: p.method as PaymentMethod,
             amount: p.amount,
@@ -159,10 +250,17 @@ export class SalesRepository {
         store: true,
       },
     });
+
+    return normalizeSale(sale);
   }
 
-  async updateStatus(id: string, status: SaleStatus, notes?: string) {
-    return this.prisma.sale.update({
+  async updateStatus(
+    id: string,
+    status: SaleStatus,
+    notes?: string,
+    db: DbClient = this.prisma as unknown as DbClient,
+  ) {
+    return db.sale.update({
       where: { id },
       data: {
         status,
@@ -214,12 +312,22 @@ export class SalesRepository {
 
     return {
       totalSales: totals._count.id,
-      totalRevenue: totals._sum.total ?? 0,
-      totalDiscount: totals._sum.discountAmount ?? 0,
-      totalTax: totals._sum.taxAmount ?? 0,
-      averageOrderValue: totals._avg.total ?? 0,
-      byPaymentMethod,
-      topProducts,
+      totalRevenue: toNumber(totals._sum.total),
+      totalDiscount: toNumber(totals._sum.discountAmount),
+      totalTax: toNumber(totals._sum.taxAmount),
+      averageOrderValue: toNumber(totals._avg.total),
+      byPaymentMethod: byPaymentMethod.map((entry) => ({
+        ...entry,
+        _sum: { ...entry._sum, amount: toNumber(entry._sum.amount) },
+      })),
+      topProducts: topProducts.map((entry) => ({
+        ...entry,
+        _sum: {
+          ...entry._sum,
+          quantity: toNumber(entry._sum.quantity),
+          subtotal: toNumber(entry._sum.subtotal),
+        },
+      })),
     };
   }
 }

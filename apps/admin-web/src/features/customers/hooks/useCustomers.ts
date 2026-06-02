@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { customersService } from '../services/customers.service';
 import type { CustomerFilters } from '../types/customer.types';
 
@@ -8,18 +8,18 @@ export const useCustomers = (filters?: CustomerFilters) =>
     queryFn: () => customersService.getCustomers(filters),
   });
 
-export const useCustomer = (id: string) =>
+export const useCustomer = (id: string, enabled = true) =>
   useQuery({
     queryKey: ['customers', id],
     queryFn: () => customersService.getCustomerById(id),
-    enabled: !!id,
+    enabled: enabled && !!id,
   });
 
-export const useCustomerSales = (id: string) =>
+export const useCustomerStats = (id: string, enabled = true) =>
   useQuery({
-    queryKey: ['customers', id, 'sales'],
-    queryFn: () => customersService.getCustomerSales(id),
-    enabled: !!id,
+    queryKey: ['customers', id, 'stats'],
+    queryFn: () => customersService.getCustomerStats(id),
+    enabled: enabled && !!id,
   });
 
 export const useCreateCustomer = () => {

@@ -1,12 +1,14 @@
 import {
   Injectable,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { AuthRepository } from './auth.repository';
 import { LoginDto } from './dto/login.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtPayload } from './types/jwt-payload.type';
 import { AuthResponseDto } from './dto/auth-response.dto';
 
@@ -18,8 +20,14 @@ export class AuthService {
     private configService: ConfigService,
   ) {}
 
-  async login(dto: LoginDto, tenantId: string): Promise<AuthResponseDto> {
-    const user = await this.authRepository.findUserByEmail(dto.email, tenantId);
+  async login(dto: LoginDto, tenantSlug: string): Promise<AuthResponseDto> {
+    const tenant = await this.authRepository.findTenantBySlug(tenantSlug);
+
+    if (!tenant) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const user = await this.authRepository.findUserByEmail(dto.email, tenant.id);
 
     if (!user || !user.isActive) {
       throw new UnauthorizedException('Invalid credentials');
@@ -124,6 +132,35 @@ export class AuthService {
       lastLoginAt: user.lastLoginAt,
       roles,
       permissions,
+    };
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    if (dto.newPassword !== dto.confirmPassword) {
+      throw new BadRequestException('Passwords do not match');
+    }
+
+    const user = await this.authRepository.findUserById(userId);
+
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const currentPasswordValid = await bcrypt.compare(
+      dto.currentPassword,
+      user.passwordHash,
+    );
+
+    if (!currentPasswordValid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const newPasswordHash = await bcrypt.hash(dto.newPassword, 10);
+
+    await this.authRepository.updatePassword(user.id, newPasswordHash);
+
+    return {
+      message: 'Password updated successfully',
     };
   }
 

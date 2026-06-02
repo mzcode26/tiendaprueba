@@ -11,12 +11,12 @@ import type {
 export const settingsService = {
   getTenantSettings: () =>
     api
-      .get<TenantSettings>('/settings/tenant')
+      .get<TenantSettings>('/settings')
       .then((r) => r.data),
 
   updateTenantSettings: (data: Partial<TenantSettings>) =>
     api
-      .patch<TenantSettings>('/settings/tenant', data)
+      .patch<TenantSettings>('/settings', data)
       .then((r) => r.data),
 
   getStores: async (

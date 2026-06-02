@@ -2,9 +2,10 @@
   "name": "@tienda/api",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
-    "build": "tsc -p tsconfig.json",
+ "scripts": {
+    "build": "prisma generate && tsc -p tsconfig.json",
     "start": "node dist/main.js",
+    "postinstall": "prisma generate",
     "start:dev": "nest start --watch",
     "lint": "eslint '{src,test}/**/*.{ts}' --fix",
     "prisma:generate": "prisma generate",

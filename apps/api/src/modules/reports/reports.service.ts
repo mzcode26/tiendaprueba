@@ -2,6 +2,32 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { QueryReportDto, ReportGroupBy } from './dto/query-report.dto';
 
+
+const normalizeBigInt = <T>(value: T): T => {
+  if (typeof value === 'bigint') {
+    return Number(value) as T;
+  }
+
+  if (value instanceof Date) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeBigInt(item)) as T;
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, val]) => [
+        key,
+        normalizeBigInt(val),
+      ]),
+    ) as T;
+  }
+
+  return value;
+};
+
 @Injectable()
 export class ReportsService {
   constructor(private prisma: PrismaService) {}
@@ -26,7 +52,7 @@ export class ReportsService {
       ? `AND s.created_at <= '${new Date(dateTo).toISOString()}'`
       : '';
 
-    return this.prisma.$queryRawUnsafe<
+    const rows = await this.prisma.$queryRawUnsafe<
       Array<{ period: Date; total_sales: bigint; total_revenue: number }>
     >(`
       SELECT
@@ -43,6 +69,8 @@ export class ReportsService {
       GROUP BY period
       ORDER BY period ASC
     `);
+
+    return rows.map((row) => normalizeBigInt(row));
   }
 
   // ─── Top Products ──────────────────────────────────────────────────────────
@@ -58,7 +86,7 @@ export class ReportsService {
       ? `AND s.created_at <= '${new Date(dateTo).toISOString()}'`
       : '';
 
-    return this.prisma.$queryRawUnsafe<
+    const rows = await this.prisma.$queryRawUnsafe<
       Array<{
         product_id: string;
         product_name: string;
@@ -87,6 +115,8 @@ export class ReportsService {
       ORDER BY total_quantity DESC
       LIMIT ${limit}
     `);
+
+    return rows.map((row) => normalizeBigInt(row));
   }
 
   // ─── Top Customers ─────────────────────────────────────────────────────────
@@ -102,7 +132,7 @@ export class ReportsService {
       ? `AND s.created_at <= '${new Date(dateTo).toISOString()}'`
       : '';
 
-    return this.prisma.$queryRawUnsafe<
+    const rows = await this.prisma.$queryRawUnsafe<
       Array<{
         customer_id: string;
         full_name: string;
@@ -130,6 +160,8 @@ export class ReportsService {
       ORDER BY total_spent DESC
       LIMIT ${limit}
     `);
+
+    return rows.map((row) => normalizeBigInt(row));
   }
 
   // ─── Revenue by Category ───────────────────────────────────────────────────
@@ -145,7 +177,7 @@ export class ReportsService {
       ? `AND s.created_at <= '${new Date(dateTo).toISOString()}'`
       : '';
 
-    return this.prisma.$queryRawUnsafe<
+    const rows = await this.prisma.$queryRawUnsafe<
       Array<{
         category_id: string;
         category_name: string;
@@ -172,6 +204,8 @@ export class ReportsService {
       GROUP BY cat.id, cat.name
       ORDER BY total_revenue DESC
     `);
+
+    return rows.map((row) => normalizeBigInt(row));
   }
 
   // ─── Revenue by Payment Method ─────────────────────────────────────────────
@@ -187,7 +221,7 @@ async getRevenueByPaymentMethod(tenantId: string, dto: QueryReportDto) {
     ? `AND s.created_at <= '${new Date(dateTo).toISOString()}'`
     : '';
 
-  return this.prisma.$queryRawUnsafe<
+  const rows = await this.prisma.$queryRawUnsafe<
     Array<{
       method: string;
       total_transactions: bigint;
@@ -209,6 +243,8 @@ async getRevenueByPaymentMethod(tenantId: string, dto: QueryReportDto) {
     GROUP BY pmt.method
     ORDER BY total_amount DESC
   `);
+
+  return rows.map((row) => normalizeBigInt(row));
 }
 
   // ─── Inventory Valuation ───────────────────────────────────────────────────

@@ -5,10 +5,14 @@ import AuthLayout from '../layouts/AuthLayout';
 import DashboardLayout from '../layouts/DashboardLayout';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import NotFound from '../pages/NotFound';
-import POSPage from '../features/sales/pages/POSPage';
+import POSPage from '../features/pos/pages/POSPage';
 
 
-const LoginPage = lazy(() => import('../features/auth/pages/LoginPage'));
+const LoginPage = lazy(() =>
+  import('../features/auth/pages/LoginPage').then((m) => ({
+    default: m.LoginPage,
+  }))
+);
 const DashboardPage = lazy(() => import('../pages/DashboardPage'));
 const ProductsPage = lazy(() => import('../features/products/pages/ProductsPage'));
 const InventoryPage = lazy(() => import('../features/inventory/pages/InventoryPage'));

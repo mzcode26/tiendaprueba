@@ -1,14 +1,48 @@
 import api from '../../../lib/axios';
-import type { LoginCredentials, LoginResponse } from '../types/auth.types';
-import type { ApiResponse } from '../../../types/api.types';
+import type {
+  LoginCredentials,
+  LoginResponse,
+  AuthUser,
+} from '../types/auth.types';
+
+type ApiResponse<T> = {
+  success: boolean;
+  data: T;
+  timestamp?: string;
+};
 
 export const authService = {
-  login: (credentials: LoginCredentials) =>
-    api.post<ApiResponse<LoginResponse>>('/auth/login', credentials).then(r => r.data),
+  login: async (credentials: LoginCredentials, tenantId: string) => {
+    const response = await api.post<ApiResponse<LoginResponse>>(
+      '/auth/login',
+      credentials,
+      {
+        headers: {
+          'x-tenant-id': tenantId,
+        },
+      },
+    );
 
-  logout: () =>
-    api.post('/auth/logout').then(r => r.data),
+    return response.data.data;
+  },
 
-  me: () =>
-    api.get<ApiResponse<LoginResponse['user']>>('/auth/me').then(r => r.data),
+  refresh: async (refreshToken: string) => {
+    const response = await api.post<ApiResponse<LoginResponse>>(
+      '/auth/refresh',
+      {
+        refreshToken,
+      },
+    );
+
+    return response.data.data;
+  },
+
+  getProfile: async () => {
+    const response = await api.get<ApiResponse<AuthUser>>('/auth/profile');
+    return response.data.data;
+  },
+
+  logout: async () => {
+    await api.post('/auth/logout');
+  },
 };

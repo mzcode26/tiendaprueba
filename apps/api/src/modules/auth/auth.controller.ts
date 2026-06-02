@@ -14,6 +14,7 @@ import { CurrentUser } from './decorators/current-user.decorator';
 import { RefreshAuthGuard } from './guards/refresh-auth.guard';
 import type { JwtPayload } from './types/jwt-payload.type';
 import { Headers } from '@nestjs/common';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -46,5 +47,14 @@ login(
   @Get('profile')
   getProfile(@CurrentUser() user: JwtPayload) {
     return this.authService.getProfile(user.sub);
+  }
+
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  changePassword(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(user.sub, dto);
   }
 }

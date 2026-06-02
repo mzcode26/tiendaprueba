@@ -1,6 +1,6 @@
 import axios, { type AxiosError, type AxiosRequestConfig } from 'axios';
 import { useAuthStore } from '../stores/auth.store';
-import type { RefreshTokenResponse } from '../features/auth/types/auth.types';
+import type { RefreshTokenResponse, AuthUser } from '../features/auth/types/auth.types';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api/v1',
@@ -19,19 +19,24 @@ const authClient = axios.create({
 let isRefreshing = false;
 const refreshQueue: Array<(token: string | null) => void> = [];
 
-const processQueue = (error: Error | null, token: string | null) => {
+const processQueue = (_error: Error | null, token: string | null) => {
   refreshQueue.forEach((callback) => callback(token));
   refreshQueue.length = 0;
-  if (error) {
-    // Errors are handled per-request.
-  }
 };
 
 api.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().token;
-  if (token && config.headers) {
-    config.headers.Authorization = `Bearer ${token}`;
+  const { token, user } = useAuthStore.getState();
+
+  if (config.headers) {
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    if (user?.tenantId) {
+      config.headers['x-tenant-id'] = user.tenantId;
+    }
   }
+
   return config;
 });
 
@@ -41,8 +46,13 @@ api.interceptors.response.use(
     const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
     const status = error.response?.status;
 
-    if (status === 401 && !originalRequest._retry && originalRequest.url !== '/auth/refresh' && originalRequest.url !== '/auth/login') {
+    const isAuthEndpoint =
+      originalRequest.url === '/auth/refresh' ||
+      originalRequest.url === '/auth/login';
+
+    if (status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
+
       const refreshToken = useAuthStore.getState().refreshToken;
 
       if (!refreshToken) {
@@ -53,30 +63,41 @@ api.interceptors.response.use(
 
       if (!isRefreshing) {
         isRefreshing = true;
+
         authClient
-          .post<{ data: RefreshTokenResponse }>('/auth/refresh', { refreshToken })
+          .post<{ success: boolean; data: RefreshTokenResponse }>(
+            '/auth/refresh',
+            { refreshToken },
+          )
           .then((response) => {
             const { accessToken, refreshToken: newRefreshToken } = response.data.data;
             const currentUser = useAuthStore.getState().user;
-            useAuthStore.getState().setAuth(accessToken, newRefreshToken, {
-              ...(currentUser ?? {
-                id: '',
-                email: '',
-                firstName: '',
-                lastName: '',
-                name: '',
-                tenantId: '',
-                roles: [],
-              }),
-            });
+
+            const safeUser: AuthUser = currentUser ?? {
+              id: '',
+              email: '',
+              firstName: '',
+              lastName: '',
+              tenantId: '',
+              roles: [],
+              permissions: [],
+            };
+
+            useAuthStore
+              .getState()
+              .setAuth(accessToken, newRefreshToken, safeUser);
+
             processQueue(null, accessToken);
-            return accessToken;
           })
           .catch((refreshError) => {
-            processQueue(refreshError instanceof Error ? refreshError : new Error('Session expired'), null);
+            processQueue(
+              refreshError instanceof Error
+                ? refreshError
+                : new Error('Session expired'),
+              null,
+            );
             useAuthStore.getState().clearAuth();
             window.location.assign('/login');
-            return null;
           })
           .finally(() => {
             isRefreshing = false;
@@ -95,8 +116,14 @@ api.interceptors.response.use(
       });
     }
 
-    if (error.response?.data && typeof error.response.data === 'object' && 'message' in error.response.data) {
-      return Promise.reject(new Error((error.response.data as { message: string }).message));
+    if (
+      error.response?.data &&
+      typeof error.response.data === 'object' &&
+      'message' in error.response.data
+    ) {
+      return Promise.reject(
+        new Error((error.response.data as { message: string }).message),
+      );
     }
 
     return Promise.reject(error);

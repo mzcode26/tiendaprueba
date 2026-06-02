@@ -159,7 +159,7 @@ export default function ProductsPage() {
   };
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-3 p-3 sm:space-y-4 sm:p-4 md:space-y-6 md:p-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Productos</h1>
@@ -168,7 +168,7 @@ export default function ProductsPage() {
 
         <button
           onClick={openNewProduct}
-          className="rounded-lg bg-black px-4 py-2 text-white"
+          className="rounded-lg bg-black px-4 py-2 text-gray-100"
         >
           Nuevo producto
         </button>

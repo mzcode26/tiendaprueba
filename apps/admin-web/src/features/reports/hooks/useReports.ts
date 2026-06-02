@@ -4,13 +4,13 @@ import type { ReportFilters } from '../types/reports.types';
 
 export const useSalesSummary = (filters?: ReportFilters) =>
   useQuery({
-    queryKey: ['reports', 'summary', filters],
-    queryFn: () => reportsService.getSalesSummary(filters),
+    queryKey: ['reports', 'dashboard', filters],
+    queryFn: () => reportsService.getDashboardSummary(filters),
   });
 
 export const useSalesByDay = (filters?: ReportFilters) =>
   useQuery({
-    queryKey: ['reports', 'by-day', filters],
+    queryKey: ['reports', 'sales-over-time', filters],
     queryFn: () => reportsService.getSalesByDay(filters),
   });
 

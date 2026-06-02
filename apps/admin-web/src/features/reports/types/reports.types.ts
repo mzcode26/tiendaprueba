@@ -1,36 +1,48 @@
-export interface SalesSummary {
-  totalSales: number;
-  totalRevenue: number;
-  totalCost: number;
-  grossProfit: number;
-  averageTicket: number;
-  period: string;
+export type ReportPeriod = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'custom';
+
+export interface ReportFilters {
+  storeId?: string;
+  period?: ReportPeriod;
+  startDate?: string;
+  endDate?: string;
 }
 
-export interface SalesByDay {
-  date: string;
-  sales: number;
-  revenue: number;
+export interface DashboardSummary {
+  today: {
+    sales: number;
+    revenue: number;
+  };
+  currentMonth: {
+    sales: number;
+    revenue: number;
+    revenueGrowth: number;
+  };
+  lastMonth: {
+    sales: number;
+    revenue: number;
+  };
+  totalCustomers: number;
+  lowStockAlerts: number;
+}
+
+export interface SalesOverTime {
+  period: string;
+  totalSales: number;
+  totalRevenue: number;
 }
 
 export interface TopProduct {
   productId: string;
   productName: string;
-  sku: string;
-  quantitySold: number;
-  revenue: number;
+  variantSku: string;
+  totalQuantity: number;
+  totalRevenue: number;
 }
 
 export interface TopCustomer {
   customerId: string;
-  customerName: string;
-  salesCount: number;
+  fullName: string;
+  email: string;
+  totalOrders: number;
   totalSpent: number;
-}
-
-export interface ReportFilters {
-  startDate?: string;
-  endDate?: string;
-  storeId?: string;
-  period?: 'today' | 'week' | 'month' | 'quarter' | 'year' | 'custom';
 }

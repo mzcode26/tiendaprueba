@@ -40,7 +40,7 @@ export function TransferStockModal({
       toStoreId: '',
       variantId: '',
       quantity: 0,
-      notes: '',
+      reason: '',
     },
   });
 
@@ -53,7 +53,7 @@ export function TransferStockModal({
         toStoreId: '',
         variantId: item.variantId,
         quantity: 0,
-        notes: '',
+        reason: '',
       });
     }
   }, [open, item, reset]);
@@ -136,17 +136,17 @@ export function TransferStockModal({
 
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
-              Observación
+              Motivo
             </label>
             <textarea
               rows={3}
-              {...register('notes')}
+              {...register('reason')}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500"
               placeholder="Motivo de la transferencia"
             />
-            {errors.notes && (
+            {errors.reason && (
               <p className="mt-1 text-sm text-red-500">
-                {errors.notes.message}
+                {errors.reason.message}
               </p>
             )}
           </div>
@@ -163,7 +163,7 @@ export function TransferStockModal({
             <button
               type="submit"
               disabled={isLoading}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isLoading ? 'Guardando...' : 'Transferir stock'}
             </button>
