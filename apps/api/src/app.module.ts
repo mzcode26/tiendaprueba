@@ -18,6 +18,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { StoresModule } from './modules/stores/stores.module';
 import { BrandsModule } from './modules/brands/brands.module';
+import { SettingsModule } from './modules/settings/settings.module';
 
 // Guards / Filters / Interceptors
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
@@ -47,6 +48,7 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
     CategoriesModule,
     BrandsModule,
     StoresModule,
+    SettingsModule,
   ],
   providers: [
     {
